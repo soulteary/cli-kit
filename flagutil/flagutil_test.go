@@ -304,14 +304,20 @@ func TestReadPasswordFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	// Write password to file
 	testPassword := "  my-secret-password  \n"
 	if _, err := tmpFile.WriteString(testPassword); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
 
 	// Read password from file
 	password, err := ReadPasswordFromFile(tmpFile.Name())
@@ -352,7 +358,11 @@ func TestReadPasswordFromFile_AbsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Change to the temp directory
 	if err := os.Chdir(tmpDir); err != nil {
@@ -360,7 +370,9 @@ func TestReadPasswordFromFile_AbsError(t *testing.T) {
 	}
 
 	// Remove the directory while we're in it (on some systems this might cause issues)
-	os.RemoveAll(tmpDir)
+	if err := os.RemoveAll(tmpDir); err != nil {
+		t.Logf("Failed to remove temp dir: %v", err)
+	}
 
 	// Try to read a file with a relative path that might cause Abs to fail
 	// Note: This test might not always trigger the error branch depending on OS behavior
@@ -372,4 +384,32 @@ func TestReadPasswordFromFile_AbsError(t *testing.T) {
 	}
 
 	// Restore working directory (already handled by defer)
+}
+
+func TestReadPasswordFromFile_EmptyFile(t *testing.T) {
+	// Create a temporary file with empty content
+	tmpFile, err := os.CreateTemp("", "test-password-empty-*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
+
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	// Read password from empty file
+	password, err := ReadPasswordFromFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("ReadPasswordFromFile() error = %v", err)
+	}
+
+	// Password should be empty string after trimming
+	if password != "" {
+		t.Errorf("ReadPasswordFromFile() = %q, want empty string", password)
+	}
 }

@@ -277,3 +277,52 @@ func TestGetStringSlice(t *testing.T) {
 		t.Errorf("GetStringSlice() with empty sep = %v, want %v", got, []string{"x", "y", "z"})
 	}
 }
+
+func TestLookup(t *testing.T) {
+	// Test with environment variable set
+	setEnv(t, "TEST_LOOKUP", "test_value")
+	defer unsetEnv(t, "TEST_LOOKUP")
+
+	value, ok := Lookup("TEST_LOOKUP")
+	if !ok || value != "test_value" {
+		t.Errorf("Lookup() = (%v, %v), want (%v, %v)", value, ok, "test_value", true)
+	}
+
+	// Test with empty string (should return true, empty string)
+	setEnv(t, "TEST_LOOKUP_EMPTY", "")
+	defer unsetEnv(t, "TEST_LOOKUP_EMPTY")
+
+	value, ok = Lookup("TEST_LOOKUP_EMPTY")
+	if !ok || value != "" {
+		t.Errorf("Lookup() with empty value = (%v, %v), want (%v, %v)", value, ok, "", true)
+	}
+
+	// Test with non-existent variable
+	value, ok = Lookup("NONEXISTENT_LOOKUP")
+	if ok || value != "" {
+		t.Errorf("Lookup() with non-existent = (%v, %v), want (%v, %v)", value, ok, "", false)
+	}
+}
+
+func TestHas(t *testing.T) {
+	// Test with environment variable set
+	setEnv(t, "TEST_HAS", "test_value")
+	defer unsetEnv(t, "TEST_HAS")
+
+	if !Has("TEST_HAS") {
+		t.Error("Has() should return true when variable is set")
+	}
+
+	// Test with empty string (should return true)
+	setEnv(t, "TEST_HAS_EMPTY", "")
+	defer unsetEnv(t, "TEST_HAS_EMPTY")
+
+	if !Has("TEST_HAS_EMPTY") {
+		t.Error("Has() should return true when variable is set to empty string")
+	}
+
+	// Test with non-existent variable
+	if Has("NONEXISTENT_HAS") {
+		t.Error("Has() should return false when variable does not exist")
+	}
+}

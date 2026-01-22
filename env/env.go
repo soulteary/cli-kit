@@ -7,6 +7,20 @@ import (
 	"time"
 )
 
+// Lookup retrieves an environment variable value and a boolean indicating whether it was set.
+// This is useful for distinguishing between "not set" and "set to empty string".
+// Returns (value, true) if the variable exists, (empty string, false) otherwise.
+func Lookup(key string) (string, bool) {
+	return os.LookupEnv(key)
+}
+
+// Has checks if an environment variable is set (even if empty).
+// Returns true if the variable exists, false otherwise.
+func Has(key string) bool {
+	_, ok := os.LookupEnv(key)
+	return ok
+}
+
 // Get retrieves an environment variable value, returning defaultValue if not set
 func Get(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
