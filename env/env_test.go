@@ -6,10 +6,26 @@ import (
 	"time"
 )
 
+// setEnv sets an environment variable and panics on error (should never happen in tests)
+func setEnv(t *testing.T, key, value string) {
+	t.Helper()
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("os.Setenv(%q, %q) failed: %v", key, value, err)
+	}
+}
+
+// unsetEnv unsets an environment variable and panics on error (should never happen in tests)
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("os.Unsetenv(%q) failed: %v", key, err)
+	}
+}
+
 func TestGet(t *testing.T) {
 	// Test with environment variable set
-	os.Setenv("TEST_KEY", "test_value")
-	defer os.Unsetenv("TEST_KEY")
+	setEnv(t, "TEST_KEY", "test_value")
+	defer unsetEnv(t, "TEST_KEY")
 
 	if got := Get("TEST_KEY", "default"); got != "test_value" {
 		t.Errorf("Get() = %v, want %v", got, "test_value")
@@ -23,16 +39,16 @@ func TestGet(t *testing.T) {
 
 func TestGetTrimmed(t *testing.T) {
 	// Test with trimmed value
-	os.Setenv("TEST_TRIMMED", "  value  ")
-	defer os.Unsetenv("TEST_TRIMMED")
+	setEnv(t, "TEST_TRIMMED", "  value  ")
+	defer unsetEnv(t, "TEST_TRIMMED")
 
 	if got := GetTrimmed("TEST_TRIMMED", "default"); got != "value" {
 		t.Errorf("GetTrimmed() = %v, want %v", got, "value")
 	}
 
 	// Test with whitespace only (should return default)
-	os.Setenv("TEST_TRIMMED_EMPTY", "   ")
-	defer os.Unsetenv("TEST_TRIMMED_EMPTY")
+	setEnv(t, "TEST_TRIMMED_EMPTY", "   ")
+	defer unsetEnv(t, "TEST_TRIMMED_EMPTY")
 
 	if got := GetTrimmed("TEST_TRIMMED_EMPTY", "default"); got != "default" {
 		t.Errorf("GetTrimmed() = %v, want %v", got, "default")
@@ -46,16 +62,16 @@ func TestGetTrimmed(t *testing.T) {
 
 func TestGetInt(t *testing.T) {
 	// Test with valid integer
-	os.Setenv("TEST_INT", "42")
-	defer os.Unsetenv("TEST_INT")
+	setEnv(t, "TEST_INT", "42")
+	defer unsetEnv(t, "TEST_INT")
 
 	if got := GetInt("TEST_INT", 0); got != 42 {
 		t.Errorf("GetInt() = %v, want %v", got, 42)
 	}
 
 	// Test with invalid integer (should return default)
-	os.Setenv("TEST_INVALID", "not_a_number")
-	defer os.Unsetenv("TEST_INVALID")
+	setEnv(t, "TEST_INVALID", "not_a_number")
+	defer unsetEnv(t, "TEST_INVALID")
 
 	if got := GetInt("TEST_INVALID", 10); got != 10 {
 		t.Errorf("GetInt() = %v, want %v", got, 10)
@@ -69,16 +85,16 @@ func TestGetInt(t *testing.T) {
 
 func TestGetInt64(t *testing.T) {
 	// Test with valid int64
-	os.Setenv("TEST_INT64", "922337203685477580")
-	defer os.Unsetenv("TEST_INT64")
+	setEnv(t, "TEST_INT64", "922337203685477580")
+	defer unsetEnv(t, "TEST_INT64")
 
 	if got := GetInt64("TEST_INT64", 0); got != 922337203685477580 {
 		t.Errorf("GetInt64() = %v, want %v", got, int64(922337203685477580))
 	}
 
 	// Test with invalid int64 (should return default)
-	os.Setenv("TEST_INVALID_INT64", "not_a_number")
-	defer os.Unsetenv("TEST_INVALID_INT64")
+	setEnv(t, "TEST_INVALID_INT64", "not_a_number")
+	defer unsetEnv(t, "TEST_INVALID_INT64")
 
 	if got := GetInt64("TEST_INVALID_INT64", 10); got != 10 {
 		t.Errorf("GetInt64() = %v, want %v", got, int64(10))
@@ -92,16 +108,16 @@ func TestGetInt64(t *testing.T) {
 
 func TestGetUint(t *testing.T) {
 	// Test with valid uint
-	os.Setenv("TEST_UINT", "42")
-	defer os.Unsetenv("TEST_UINT")
+	setEnv(t, "TEST_UINT", "42")
+	defer unsetEnv(t, "TEST_UINT")
 
 	if got := GetUint("TEST_UINT", 0); got != uint(42) {
 		t.Errorf("GetUint() = %v, want %v", got, uint(42))
 	}
 
 	// Test with invalid uint (should return default)
-	os.Setenv("TEST_INVALID_UINT", "not_a_number")
-	defer os.Unsetenv("TEST_INVALID_UINT")
+	setEnv(t, "TEST_INVALID_UINT", "not_a_number")
+	defer unsetEnv(t, "TEST_INVALID_UINT")
 
 	if got := GetUint("TEST_INVALID_UINT", 10); got != uint(10) {
 		t.Errorf("GetUint() = %v, want %v", got, uint(10))
@@ -115,16 +131,16 @@ func TestGetUint(t *testing.T) {
 
 func TestGetUint64(t *testing.T) {
 	// Test with valid uint64
-	os.Setenv("TEST_UINT64", "184467440737095516")
-	defer os.Unsetenv("TEST_UINT64")
+	setEnv(t, "TEST_UINT64", "184467440737095516")
+	defer unsetEnv(t, "TEST_UINT64")
 
 	if got := GetUint64("TEST_UINT64", 0); got != 184467440737095516 {
 		t.Errorf("GetUint64() = %v, want %v", got, uint64(184467440737095516))
 	}
 
 	// Test with invalid uint64 (should return default)
-	os.Setenv("TEST_INVALID_UINT64", "not_a_number")
-	defer os.Unsetenv("TEST_INVALID_UINT64")
+	setEnv(t, "TEST_INVALID_UINT64", "not_a_number")
+	defer unsetEnv(t, "TEST_INVALID_UINT64")
 
 	if got := GetUint64("TEST_INVALID_UINT64", 10); got != 10 {
 		t.Errorf("GetUint64() = %v, want %v", got, uint64(10))
@@ -138,8 +154,8 @@ func TestGetUint64(t *testing.T) {
 
 func TestGetDuration(t *testing.T) {
 	// Test with valid duration
-	os.Setenv("TEST_DURATION", "5m")
-	defer os.Unsetenv("TEST_DURATION")
+	setEnv(t, "TEST_DURATION", "5m")
+	defer unsetEnv(t, "TEST_DURATION")
 
 	expected := 5 * time.Minute
 	if got := GetDuration("TEST_DURATION", time.Second); got != expected {
@@ -147,8 +163,8 @@ func TestGetDuration(t *testing.T) {
 	}
 
 	// Test with invalid duration (should return default)
-	os.Setenv("TEST_INVALID_DURATION", "invalid")
-	defer os.Unsetenv("TEST_INVALID_DURATION")
+	setEnv(t, "TEST_INVALID_DURATION", "invalid")
+	defer unsetEnv(t, "TEST_INVALID_DURATION")
 
 	defaultDuration := 10 * time.Second
 	if got := GetDuration("TEST_INVALID_DURATION", defaultDuration); got != defaultDuration {
@@ -164,16 +180,16 @@ func TestGetDuration(t *testing.T) {
 
 func TestGetFloat64(t *testing.T) {
 	// Test with valid float
-	os.Setenv("TEST_FLOAT64", "3.14")
-	defer os.Unsetenv("TEST_FLOAT64")
+	setEnv(t, "TEST_FLOAT64", "3.14")
+	defer unsetEnv(t, "TEST_FLOAT64")
 
 	if got := GetFloat64("TEST_FLOAT64", 0); got != 3.14 {
 		t.Errorf("GetFloat64() = %v, want %v", got, 3.14)
 	}
 
 	// Test with invalid float (should return default)
-	os.Setenv("TEST_INVALID_FLOAT64", "not_a_number")
-	defer os.Unsetenv("TEST_INVALID_FLOAT64")
+	setEnv(t, "TEST_INVALID_FLOAT64", "not_a_number")
+	defer unsetEnv(t, "TEST_INVALID_FLOAT64")
 
 	if got := GetFloat64("TEST_INVALID_FLOAT64", 2.71); got != 2.71 {
 		t.Errorf("GetFloat64() = %v, want %v", got, 2.71)
@@ -187,24 +203,24 @@ func TestGetFloat64(t *testing.T) {
 
 func TestGetBool(t *testing.T) {
 	// Test with true
-	os.Setenv("TEST_BOOL", "true")
-	defer os.Unsetenv("TEST_BOOL")
+	setEnv(t, "TEST_BOOL", "true")
+	defer unsetEnv(t, "TEST_BOOL")
 
 	if got := GetBool("TEST_BOOL", false); got != true {
 		t.Errorf("GetBool() = %v, want %v", got, true)
 	}
 
 	// Test with false
-	os.Setenv("TEST_BOOL_FALSE", "false")
-	defer os.Unsetenv("TEST_BOOL_FALSE")
+	setEnv(t, "TEST_BOOL_FALSE", "false")
+	defer unsetEnv(t, "TEST_BOOL_FALSE")
 
 	if got := GetBool("TEST_BOOL_FALSE", true); got != false {
 		t.Errorf("GetBool() = %v, want %v", got, false)
 	}
 
 	// Test with invalid boolean (should return default)
-	os.Setenv("TEST_INVALID_BOOL", "maybe")
-	defer os.Unsetenv("TEST_INVALID_BOOL")
+	setEnv(t, "TEST_INVALID_BOOL", "maybe")
+	defer unsetEnv(t, "TEST_INVALID_BOOL")
 
 	if got := GetBool("TEST_INVALID_BOOL", false); got != false {
 		t.Errorf("GetBool() = %v, want %v", got, false)
@@ -220,8 +236,8 @@ func TestGetStringSlice(t *testing.T) {
 	defaultValue := []string{"default"}
 
 	// Test with comma separated values
-	os.Setenv("TEST_STRING_SLICE", "a, b, , c")
-	defer os.Unsetenv("TEST_STRING_SLICE")
+	setEnv(t, "TEST_STRING_SLICE", "a, b, , c")
+	defer unsetEnv(t, "TEST_STRING_SLICE")
 
 	got := GetStringSlice("TEST_STRING_SLICE", defaultValue, ",")
 	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
@@ -229,8 +245,8 @@ func TestGetStringSlice(t *testing.T) {
 	}
 
 	// Test with custom separator
-	os.Setenv("TEST_STRING_SLICE_CUSTOM", "one|two| three ")
-	defer os.Unsetenv("TEST_STRING_SLICE_CUSTOM")
+	setEnv(t, "TEST_STRING_SLICE_CUSTOM", "one|two| three ")
+	defer unsetEnv(t, "TEST_STRING_SLICE_CUSTOM")
 
 	got = GetStringSlice("TEST_STRING_SLICE_CUSTOM", defaultValue, "|")
 	if len(got) != 3 || got[0] != "one" || got[1] != "two" || got[2] != "three" {
@@ -238,8 +254,8 @@ func TestGetStringSlice(t *testing.T) {
 	}
 
 	// Test with empty value (should return default)
-	os.Setenv("TEST_STRING_SLICE_EMPTY", " , , ")
-	defer os.Unsetenv("TEST_STRING_SLICE_EMPTY")
+	setEnv(t, "TEST_STRING_SLICE_EMPTY", " , , ")
+	defer unsetEnv(t, "TEST_STRING_SLICE_EMPTY")
 
 	got = GetStringSlice("TEST_STRING_SLICE_EMPTY", defaultValue, ",")
 	if len(got) != 1 || got[0] != "default" {
@@ -253,8 +269,8 @@ func TestGetStringSlice(t *testing.T) {
 	}
 
 	// Test with empty separator (should default to comma)
-	os.Setenv("TEST_STRING_SLICE_EMPTY_SEP", "x,y,z")
-	defer os.Unsetenv("TEST_STRING_SLICE_EMPTY_SEP")
+	setEnv(t, "TEST_STRING_SLICE_EMPTY_SEP", "x,y,z")
+	defer unsetEnv(t, "TEST_STRING_SLICE_EMPTY_SEP")
 
 	got = GetStringSlice("TEST_STRING_SLICE_EMPTY_SEP", defaultValue, "")
 	if len(got) != 3 || got[0] != "x" || got[1] != "y" || got[2] != "z" {
