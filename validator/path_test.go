@@ -85,3 +85,140 @@ func TestValidatePath_EdgeCases(t *testing.T) {
 		t.Errorf("ValidatePath() = %q, want absolute path", path)
 	}
 }
+
+func TestValidateFileExists(t *testing.T) {
+	// Create a temporary file for testing
+	tmpFile, err := os.CreateTemp("", "test_file_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	_ = tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	// Create a temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "test_dir_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+		errType error
+	}{
+		{"existing file", tmpFilePath, false, nil},
+		{"non-existent file", "/nonexistent/path/to/file.txt", true, ErrFileNotFound},
+		{"directory instead of file", tmpDir, true, ErrNotAFile},
+		{"empty path", "", true, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFileExists(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateFileExists(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateFileReadable(t *testing.T) {
+	// Create a temporary file for testing
+	tmpFile, err := os.CreateTemp("", "test_readable_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	_, _ = tmpFile.WriteString("test content")
+	_ = tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"readable file", tmpFilePath, false},
+		{"non-existent file", "/nonexistent/path/to/file.txt", true},
+		{"empty path", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFileReadable(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateFileReadable(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateDirExists(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "test_dir_exists_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Create a temporary file for testing
+	tmpFile, err := os.CreateTemp("", "test_file_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	_ = tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+		errType error
+	}{
+		{"existing directory", tmpDir, false, nil},
+		{"non-existent directory", "/nonexistent/path/to/dir", true, ErrDirNotFound},
+		{"file instead of directory", tmpFilePath, true, ErrNotADirectory},
+		{"empty path", "", true, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDirExists(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateDirExists(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateDirWritable(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "test_dir_writable_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"writable directory", tmpDir, false},
+		{"non-existent directory", "/nonexistent/path/to/dir", true},
+		{"empty path", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDirWritable(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateDirWritable(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+}

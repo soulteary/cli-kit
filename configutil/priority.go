@@ -76,6 +76,90 @@ func ResolveInt(fs *flag.FlagSet, flagName, envKey string, defaultValue int, all
 	return defaultValue
 }
 
+// ResolveInt64 resolves an int64 configuration value with priority: CLI flag > environment variable > default value.
+// Returns the resolved int64 value.
+//
+// Parameters:
+//   - fs: FlagSet to check for CLI flag
+//   - flagName: Name of the CLI flag (e.g., "max-size")
+//   - envKey: Name of the environment variable (e.g., "MAX_SIZE")
+//   - defaultValue: Default value to use if neither CLI nor ENV is set
+//   - allowZero: If false, zero values from ENV are treated as "not set" and default is used
+func ResolveInt64(fs *flag.FlagSet, flagName, envKey string, defaultValue int64, allowZero bool) int64 {
+	// Priority 1: CLI flag (highest priority)
+	if flagutil.HasFlag(fs, flagName) {
+		value := flagutil.GetInt64(fs, flagName, defaultValue)
+		// CLI flag value is always used if flag is set, even if zero
+		return value
+	}
+
+	// Priority 2: Environment variable
+	if env.Has(envKey) {
+		value := env.GetInt64(envKey, defaultValue)
+		// If allowZero is false and value is 0, treat as "not set" and use default
+		if !allowZero && value == 0 {
+			return defaultValue
+		}
+		return value
+	}
+
+	// Priority 3: Default value
+	return defaultValue
+}
+
+// ResolveInt64WithValidation resolves an int64 configuration with custom validation function.
+// Priority: CLI flag > environment variable > default value.
+// If validator returns an error, the value is rejected and default is used.
+//
+// Parameters:
+//   - fs: FlagSet to check for CLI flag
+//   - flagName: Name of the CLI flag
+//   - envKey: Name of the environment variable
+//   - defaultValue: Default value to use
+//   - allowZero: If false, zero values from ENV are treated as "not set" and default is used
+//   - validator: Function to validate the resolved value (returns error if invalid)
+//
+// Returns:
+//   - int64: The resolved and validated value
+//   - error: Returns error if validation fails for all sources
+func ResolveInt64WithValidation(
+	fs *flag.FlagSet,
+	flagName, envKey string,
+	defaultValue int64,
+	allowZero bool,
+	validator func(int64) error,
+) (int64, error) {
+	// Priority 1: CLI flag (highest priority)
+	if flagutil.HasFlag(fs, flagName) {
+		value := flagutil.GetInt64(fs, flagName, defaultValue)
+		if err := validator(value); err == nil {
+			return value, nil
+		}
+		// Invalid CLI value, try ENV
+	}
+
+	// Priority 2: Environment variable
+	if env.Has(envKey) {
+		value := env.GetInt64(envKey, defaultValue)
+		if !allowZero && value == 0 {
+			// Treat as not set, try default
+		} else {
+			if err := validator(value); err == nil {
+				return value, nil
+			}
+		}
+		// Invalid ENV value, try default
+	}
+
+	// Priority 3: Default value
+	if err := validator(defaultValue); err == nil {
+		return defaultValue, nil
+	}
+
+	// All sources failed validation
+	return defaultValue, validator(defaultValue)
+}
+
 // ResolveBool resolves a boolean configuration value with priority: CLI flag > environment variable > default value.
 // Returns the resolved boolean value.
 //
@@ -333,6 +417,77 @@ func ResolveIntWithValidation(
 
 	// All sources failed validation
 	return defaultValue, validator(defaultValue)
+}
+
+// ResolveStringSlice resolves a string slice configuration value with priority: CLI flag > environment variable > default value.
+// For CLI flags, it expects a flag.Value implementation that collects multiple values (e.g., can be specified multiple times).
+// For environment variables, it splits the value by the specified separator.
+//
+// Parameters:
+//   - fs: FlagSet to check for CLI flag
+//   - flagName: Name of the CLI flag (e.g., "hooks")
+//   - envKey: Name of the environment variable (e.g., "HOOKS")
+//   - defaultValue: Default value to use if neither CLI nor ENV is set
+//   - sep: Separator for environment variable parsing (default ",")
+func ResolveStringSlice(fs *flag.FlagSet, flagName, envKey string, defaultValue []string, sep string) []string {
+	if sep == "" {
+		sep = ","
+	}
+
+	// Priority 1: CLI flag (highest priority)
+	if flagutil.HasFlag(fs, flagName) {
+		value := flagutil.GetString(fs, flagName, "")
+		if value != "" {
+			// Single value from flag, return as slice
+			// Note: For multi-value flags, the caller should use flag.Var with a custom type
+			return []string{value}
+		}
+	}
+
+	// Priority 2: Environment variable
+	if env.Has(envKey) {
+		result := env.GetStringSlice(envKey, nil, sep)
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	// Priority 3: Default value
+	return defaultValue
+}
+
+// ResolveStringSliceMulti resolves a string slice from a multi-value flag (flag.Value interface).
+// This function reads the current value from a flag that implements the flag.Value interface
+// and can collect multiple values (specified multiple times on command line).
+// For environment variables, it splits the value by the specified separator.
+//
+// Parameters:
+//   - fs: FlagSet to check for CLI flag
+//   - flagName: Name of the CLI flag (e.g., "hooks")
+//   - envKey: Name of the environment variable (e.g., "HOOKS")
+//   - currentFlagValue: Current slice value from the flag (already parsed by flag.Var)
+//   - defaultValue: Default value to use if neither CLI nor ENV is set
+//   - sep: Separator for environment variable parsing (default ",")
+func ResolveStringSliceMulti(fs *flag.FlagSet, flagName, envKey string, currentFlagValue, defaultValue []string, sep string) []string {
+	if sep == "" {
+		sep = ","
+	}
+
+	// Priority 1: CLI flag (highest priority)
+	if flagutil.HasFlag(fs, flagName) && len(currentFlagValue) > 0 {
+		return currentFlagValue
+	}
+
+	// Priority 2: Environment variable
+	if env.Has(envKey) {
+		result := env.GetStringSlice(envKey, nil, sep)
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	// Priority 3: Default value
+	return defaultValue
 }
 
 // ResolveEnum resolves an enum configuration value with validation.
