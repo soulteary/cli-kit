@@ -5,133 +5,133 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![codecov](https://codecov.io/gh/soulteary/cli-kit/graph/badge.svg)](https://codecov.io/gh/soulteary/cli-kit)
 
-[中文文档](README_CN.md)
+[English](README.md)
 
-A comprehensive Go library for building robust command-line applications. This toolkit provides utilities for environment variable management, command-line flag handling, priority-based configuration resolution, input validation, and testing support.
+一个用于构建健壮命令行应用的 Go 工具库。提供环境变量管理、命令行参数处理、优先级配置解析、输入验证和测试辅助等功能。
 
-## Features
+## 功能特性
 
-- **Environment Variable Management** - Safe and flexible environment variable operations with type conversion
-- **Flag Utilities** - Enhanced command-line flag handling with type-safe getters
-- **Configuration Resolution** - Priority-based configuration resolution (CLI flags > environment variables > defaults)
-- **Validators** - Comprehensive validation for URLs, paths, ports, host:port, and enums with SSRF protection
-- **Test Utilities** - Helper functions for testing CLI applications and configuration resolution
+- **环境变量管理** - 安全灵活的环境变量操作，支持类型转换
+- **命令行参数工具** - 增强的命令行参数处理，类型安全的取值方法
+- **配置优先级解析** - 支持优先级的配置解析（CLI 参数 > 环境变量 > 默认值）
+- **输入验证器** - 全面的验证功能，支持 URL、路径、端口、host:port、枚举值，内置 SSRF 防护
+- **测试工具** - 用于测试 CLI 应用和配置解析的辅助函数
 
-## Installation
+## 安装
 
 ```bash
 go get github.com/soulteary/cli-kit
 ```
 
-## Quick Start
+## 快速开始
 
-### Environment Variables
+### 环境变量
 
 ```go
 import "github.com/soulteary/cli-kit/env"
 
-// Check if environment variable exists
+// 检查环境变量是否存在
 if env.Has("PORT") {
-    // Variable is set
+    // 变量已设置
 }
 
-// Get with default value
+// 获取值，支持默认值
 port := env.Get("PORT", "8080")
 
-// Get typed values
+// 获取类型化的值
 portInt := env.GetInt("PORT", 8080)
 timeout := env.GetDuration("TIMEOUT", 5*time.Second)
 enabled := env.GetBool("ENABLED", false)
 ratio := env.GetFloat64("RATIO", 0.5)
 
-// Get trimmed string (removes leading/trailing whitespace)
+// 获取去除空白的字符串
 value := env.GetTrimmed("CONFIG_PATH", "")
 
-// Get string slice from comma-separated value
+// 从逗号分隔的值获取字符串切片
 hosts := env.GetStringSlice("HOSTS", []string{"localhost"}, ",")
 
-// Lookup (distinguish between not set and empty)
+// Lookup（区分"未设置"和"设置为空"）
 value, ok := env.Lookup("API_KEY")
 ```
 
-### Flag Utilities
+### 命令行参数工具
 
 ```go
 import "github.com/soulteary/cli-kit/flagutil"
 
 fs := flag.NewFlagSet("app", flag.ContinueOnError)
-port := fs.Int("port", 8080, "Server port")
+port := fs.Int("port", 8080, "服务端口")
 
-// Check if flag was set
+// 检查参数是否已设置
 if flagutil.HasFlag(fs, "port") {
-    // Flag was provided
+    // 参数已提供
 }
 
-// Get flag value with type conversion
+// 获取带类型转换的参数值
 portValue := flagutil.GetInt(fs, "port", 8080)
 timeout := flagutil.GetDuration(fs, "timeout", 5*time.Second)
 enabled := flagutil.GetBool(fs, "enabled", false)
 
-// Check if flag exists in command-line arguments
+// 检查参数是否存在于命令行中
 if flagutil.HasFlagInOSArgs("verbose") {
-    // -verbose or --verbose was provided
+    // 提供了 -verbose 或 --verbose
 }
 
-// Read password from file (with security checks)
+// 从文件读取密码（带安全检查）
 password, err := flagutil.ReadPasswordFromFile("/path/to/password.txt")
 ```
 
-### Configuration Resolution
+### 配置优先级解析
 
-The `configutil` package resolves configuration values with a clear priority order: **CLI flags > Environment variables > Default values**.
+`configutil` 包按照明确的优先级顺序解析配置值：**CLI 参数 > 环境变量 > 默认值**。
 
 ```go
 import "github.com/soulteary/cli-kit/configutil"
 
 fs := flag.NewFlagSet("app", flag.ContinueOnError)
-portFlag := fs.Int("port", 0, "Server port")
+portFlag := fs.Int("port", 0, "服务端口")
 fs.Parse(os.Args[1:])
 
-// Resolve with priority: CLI flag > ENV > default
+// 按优先级解析：CLI 参数 > 环境变量 > 默认值
 port := configutil.ResolveInt(fs, "port", "PORT", 8080, false)
 host := configutil.ResolveString(fs, "host", "HOST", "localhost", true)
 debug := configutil.ResolveBool(fs, "debug", "DEBUG", false)
 timeout := configutil.ResolveDuration(fs, "timeout", "TIMEOUT", 30*time.Second)
 
-// Resolve with validation
+// 带验证的解析
 url, err := configutil.ResolveStringWithValidation(
     fs, "url", "API_URL", "https://api.example.com",
-    true, // trimmed
+    true, // 去除空白
     func(s string) error {
         return validator.ValidateURL(s, nil)
     },
 )
 
-// Resolve enum value
+// 解析枚举值
 mode, err := configutil.ResolveEnum(
     fs, "mode", "APP_MODE", "production",
     []string{"development", "production", "staging"},
-    false, // case-insensitive
+    false, // 不区分大小写
 )
 
-// Resolve host:port with validation
+// 解析 host:port 并验证
 host, port, err := configutil.ResolveHostPort(
     fs, "addr", "SERVER_ADDR", "localhost:8080",
 )
 
-// Resolve port with automatic range validation
+// 解析端口并自动验证范围
 port, err := configutil.ResolvePort(fs, "port", "PORT", 8080)
 ```
 
-### Validators
+### 验证器
 
 ```go
 import "github.com/soulteary/cli-kit/validator"
 
-// Validate URL (with SSRF protection by default)
+// 验证 URL（默认启用 SSRF 防护）
 err := validator.ValidateURL("https://api.example.com", nil)
 
-// With custom options
+// 自定义选项
 opts := &validator.URLOptions{
     AllowedSchemes: []string{"http", "https", "ws", "wss"},
     AllowLocalhost: true,
@@ -139,35 +139,35 @@ opts := &validator.URLOptions{
 }
 err := validator.ValidateURL("http://localhost:8080", opts)
 
-// Validate port (range: 1-65535)
+// 验证端口（范围：1-65535）
 err := validator.ValidatePort(8080)
 err := validator.ValidatePortString("8080")
 
-// Validate host:port
+// 验证 host:port
 host, port, err := validator.ValidateHostPort("localhost:8080")
 
-// Validate host:port with defaults
+// 带默认值验证 host:port
 host, port, err := validator.ValidateHostPortWithDefaults("myhost", "localhost", 8080)
 
-// Validate path (with security checks)
+// 验证路径（带安全检查）
 absPath, err := validator.ValidatePath("/var/log/app.log", nil)
 
-// With custom options
+// 自定义选项
 pathOpts := &validator.PathOptions{
     AllowRelative:  false,
     AllowedDirs:    []string{"/var/log", "/tmp"},
     CheckTraversal: true,
 }
-absPath, err := validator.ValidatePath("../etc/passwd", pathOpts) // Error: path traversal
+absPath, err := validator.ValidatePath("../etc/passwd", pathOpts) // 错误：路径遍历攻击
 
-// Validate enum
+// 验证枚举
 err := validator.ValidateEnum("production", 
     []string{"development", "production", "staging"},
-    false, // case-insensitive
+    false, // 不区分大小写
 )
 ```
 
-### Test Utilities
+### 测试工具
 
 ```go
 import (
@@ -175,10 +175,10 @@ import (
     "testing"
 )
 
-// Environment variable management in tests
+// 测试中的环境变量管理
 func TestMyFunction(t *testing.T) {
     envMgr := testutil.NewEnvManager()
-    defer envMgr.Cleanup() // Automatically restores original values
+    defer envMgr.Cleanup() // 自动恢复原始值
     
     envMgr.Set("PORT", "8080")
     envMgr.SetMultiple(map[string]string{
@@ -186,40 +186,40 @@ func TestMyFunction(t *testing.T) {
         "DEBUG": "true",
     })
     
-    // Your test code here
+    // 你的测试代码
 }
 
-// Flag parsing helper
+// 参数解析辅助
 func TestFlags(t *testing.T) {
     fs := testutil.NewTestFlagSet("test")
-    port := fs.Int("port", 8080, "port")
+    port := fs.Int("port", 8080, "端口")
     
     err := testutil.ParseFlags(fs, []string{"-port", "9090"})
     if err != nil {
         t.Fatal(err)
     }
     
-    // Or use MustParseFlags to panic on error
+    // 或使用 MustParseFlags，出错时 panic
     testutil.MustParseFlags(fs, []string{"-port", "9090"})
 }
 
-// Table-driven configuration tests
+// 表驱动的配置测试
 func TestConfigResolution(t *testing.T) {
     cases := []testutil.ConfigTestCase{
         {
-            Name:     "CLI flag takes priority",
+            Name:     "CLI 参数优先",
             CLIArgs:  []string{"-port", "9090"},
             EnvVars:  map[string]string{"PORT": "8080"},
             Expected: 9090,
         },
         {
-            Name:     "ENV used when no CLI flag",
+            Name:     "无 CLI 参数时使用环境变量",
             CLIArgs:  []string{},
             EnvVars:  map[string]string{"PORT": "8080"},
             Expected: 8080,
         },
         {
-            Name:     "Default used when neither set",
+            Name:     "都未设置时使用默认值",
             CLIArgs:  []string{},
             EnvVars:  map[string]string{},
             Expected: 3000,
@@ -227,7 +227,7 @@ func TestConfigResolution(t *testing.T) {
     }
     
     resolver := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
-        fs.Int("port", 0, "Port")
+        fs.Int("port", 0, "端口")
         fs.Parse(tc.CLIArgs)
         return configutil.ResolveInt(fs, "port", "PORT", 3000, false), nil
     }
@@ -236,65 +236,65 @@ func TestConfigResolution(t *testing.T) {
 }
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 cli-kit/
-├── env/              # Environment variable utilities
-│   └── env.go        # Get, GetInt, GetBool, GetDuration, etc.
-├── flagutil/         # Command-line flag utilities
-│   └── flagutil.go   # HasFlag, GetInt, ReadPasswordFromFile, etc.
-├── configutil/       # Configuration resolution with priority
-│   └── priority.go   # ResolveString, ResolveInt, ResolveEnum, etc.
-├── validator/        # Input validation
-│   ├── url.go        # URL validation with SSRF protection
-│   ├── path.go       # Path validation with traversal protection
-│   ├── port.go       # Port range validation
-│   ├── hostport.go   # Host:port format validation
-│   └── enum.go       # Enum value validation
-└── testutil/         # Testing utilities
-    ├── env.go        # Environment variable test helpers
-    ├── flag.go       # Flag parsing test helpers
-    └── config.go     # Configuration test helpers
+├── env/              # 环境变量工具
+│   └── env.go        # Get, GetInt, GetBool, GetDuration 等
+├── flagutil/         # 命令行参数工具
+│   └── flagutil.go   # HasFlag, GetInt, ReadPasswordFromFile 等
+├── configutil/       # 优先级配置解析
+│   └── priority.go   # ResolveString, ResolveInt, ResolveEnum 等
+├── validator/        # 输入验证
+│   ├── url.go        # URL 验证，支持 SSRF 防护
+│   ├── path.go       # 路径验证，支持遍历攻击防护
+│   ├── port.go       # 端口范围验证
+│   ├── hostport.go   # host:port 格式验证
+│   └── enum.go       # 枚举值验证
+└── testutil/         # 测试工具
+    ├── env.go        # 环境变量测试辅助
+    ├── flag.go       # 参数解析测试辅助
+    └── config.go     # 配置测试辅助
 ```
 
-## Security Features
+## 安全特性
 
-| Feature | Description |
-|---------|-------------|
-| **SSRF Protection** | URL validator blocks private IPs and localhost by default |
-| **Path Traversal Prevention** | Path validator detects and blocks `..` sequences |
-| **Directory Restrictions** | Optional allowlist for permitted directories |
-| **Safe File Reading** | Password file reading with path validation |
+| 特性 | 描述 |
+|------|------|
+| **SSRF 防护** | URL 验证器默认阻止私有 IP 和 localhost |
+| **路径遍历防护** | 路径验证器检测并阻止 `..` 序列 |
+| **目录限制** | 可选的允许目录白名单 |
+| **安全文件读取** | 带路径验证的密码文件读取 |
 
-## Test Coverage
+## 测试覆盖率
 
-This project maintains high test coverage:
+本项目保持较高的测试覆盖率：
 
-| Package | Coverage |
-|---------|----------|
+| 包 | 覆盖率 |
+|------|--------|
 | configutil | 100% |
 | env | 100% |
 | flagutil | 98.7% |
 | validator | 98.1% |
 | testutil | 83.7% |
-| **Total** | **97.1%** |
+| **总计** | **97.1%** |
 
-Run tests with coverage:
+运行测试并查看覆盖率：
 
 ```bash
 go test -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
 ```
 
-## Requirements
+## 环境要求
 
-- Go 1.21 or later
+- Go 1.21 或更高版本
 
-## License
+## 许可证
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+本项目采用 Apache License 2.0 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
-## Contributing
+## 贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎贡献！请随时提交 Pull Request。
