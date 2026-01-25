@@ -61,3 +61,50 @@ func TestRunConfigTests(t *testing.T) {
 		RunConfigTests(t, cases, resolverWithError)
 	})
 }
+
+// TestRunConfigTests_ComplexTypes tests RunConfigTests with various complex types
+func TestRunConfigTests_ComplexTypes(t *testing.T) {
+	// Test with struct type
+	type Config struct {
+		Port int
+		Host string
+	}
+
+	resolverStruct := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
+		return Config{Port: 8080, Host: "localhost"}, nil
+	}
+
+	RunConfigTests(t, []ConfigTestCase{
+		{
+			Name:     "struct value",
+			EnvVars:  map[string]string{},
+			Expected: Config{Port: 8080, Host: "localhost"},
+		},
+	}, resolverStruct)
+
+	// Test with slice type
+	resolverSlice := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
+		return []string{"a", "b", "c"}, nil
+	}
+
+	RunConfigTests(t, []ConfigTestCase{
+		{
+			Name:     "slice value",
+			EnvVars:  map[string]string{},
+			Expected: []string{"a", "b", "c"},
+		},
+	}, resolverSlice)
+
+	// Test with map type
+	resolverMap := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
+		return map[string]int{"port": 8080}, nil
+	}
+
+	RunConfigTests(t, []ConfigTestCase{
+		{
+			Name:     "map value",
+			EnvVars:  map[string]string{},
+			Expected: map[string]int{"port": 8080},
+		},
+	}, resolverMap)
+}

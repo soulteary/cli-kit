@@ -76,6 +76,8 @@ func TestValidateHostPortWithDefaults(t *testing.T) {
 		{"full address", "example.com:8080", "localhost", 6379, "example.com", 8080, false},
 		{"invalid default port", "", "localhost", 0, "", 0, true},
 		{"invalid port in addr", "example.com:99999", "localhost", 6379, "", 0, true},
+		{"host only with invalid default port", "example.com", "localhost", 0, "", 0, true},
+		{"host only with negative default port", "myhost", "localhost", -1, "", 0, true},
 	}
 
 	for _, tt := range tests {
