@@ -165,6 +165,41 @@ err := validator.ValidateEnum("production",
     []string{"development", "production", "staging"},
     false, // 不区分大小写
 )
+
+// 验证手机号（支持多个地区）
+err := validator.ValidatePhone("13800138000", nil) // 任意格式
+err := validator.ValidatePhoneCN("13800138000")    // 中国大陆格式
+err := validator.ValidatePhoneUS("+12025551234")   // 美国格式
+err := validator.ValidatePhoneUK("+447911123456")  // 英国格式
+
+// 自定义选项
+phoneOpts := &validator.PhoneOptions{
+    AllowEmpty: true,
+    Region:     validator.PhoneRegionCN,
+}
+err := validator.ValidatePhone("13800138000", phoneOpts)
+
+// 验证邮箱
+err := validator.ValidateEmailSimple("user@example.com")
+
+// 带域名限制
+err := validator.ValidateEmailWithDomains("user@company.com", []string{"company.com"})
+
+// 完整选项
+emailOpts := &validator.EmailOptions{
+    AllowEmpty:     false,
+    AllowedDomains: []string{"company.com", "corp.com"},
+    BlockedDomains: []string{"spam.com"},
+}
+err := validator.ValidateEmail("user@company.com", emailOpts)
+
+// 验证用户名
+err := validator.ValidateUsername("john_doe", nil)           // 默认风格（3-32字符）
+err := validator.ValidateUsernameSimple("johndoe")           // 仅字母数字
+err := validator.ValidateUsernameRelaxed("john.doe")         // 允许点号（3-64字符）
+
+// 带保留名检查
+err := validator.ValidateUsernameWithReserved("admin", []string{"admin", "root", "system"})
 ```
 
 ### 测试工具
@@ -251,7 +286,10 @@ cli-kit/
 │   ├── path.go       # 路径验证，支持遍历攻击防护
 │   ├── port.go       # 端口范围验证
 │   ├── hostport.go   # host:port 格式验证
-│   └── enum.go       # 枚举值验证
+│   ├── enum.go       # 枚举值验证
+│   ├── phone.go      # 手机号验证（中国/美国/英国/国际格式）
+│   ├── email.go      # 邮箱验证，支持域名白名单/黑名单
+│   └── username.go   # 用户名格式验证，支持多种风格
 └── testutil/         # 测试工具
     ├── env.go        # 环境变量测试辅助
     ├── flag.go       # 参数解析测试辅助

@@ -165,6 +165,41 @@ err := validator.ValidateEnum("production",
     []string{"development", "production", "staging"},
     false, // case-insensitive
 )
+
+// Validate phone number (supports multiple regions)
+err := validator.ValidatePhone("13800138000", nil) // Any format
+err := validator.ValidatePhoneCN("13800138000")    // Chinese mainland
+err := validator.ValidatePhoneUS("+12025551234")   // US format
+err := validator.ValidatePhoneUK("+447911123456")  // UK format
+
+// With custom options
+phoneOpts := &validator.PhoneOptions{
+    AllowEmpty: true,
+    Region:     validator.PhoneRegionCN,
+}
+err := validator.ValidatePhone("13800138000", phoneOpts)
+
+// Validate email
+err := validator.ValidateEmailSimple("user@example.com")
+
+// With domain restrictions
+err := validator.ValidateEmailWithDomains("user@company.com", []string{"company.com"})
+
+// With full options
+emailOpts := &validator.EmailOptions{
+    AllowEmpty:     false,
+    AllowedDomains: []string{"company.com", "corp.com"},
+    BlockedDomains: []string{"spam.com"},
+}
+err := validator.ValidateEmail("user@company.com", emailOpts)
+
+// Validate username
+err := validator.ValidateUsername("john_doe", nil)           // Default style (3-32 chars)
+err := validator.ValidateUsernameSimple("johndoe")           // Alphanumeric only
+err := validator.ValidateUsernameRelaxed("john.doe")         // Allows dots (3-64 chars)
+
+// With reserved names
+err := validator.ValidateUsernameWithReserved("admin", []string{"admin", "root", "system"})
 ```
 
 ### Test Utilities
@@ -251,7 +286,10 @@ cli-kit/
 │   ├── path.go       # Path validation with traversal protection
 │   ├── port.go       # Port range validation
 │   ├── hostport.go   # Host:port format validation
-│   └── enum.go       # Enum value validation
+│   ├── enum.go       # Enum value validation
+│   ├── phone.go      # Phone number validation (CN/US/UK/International)
+│   ├── email.go      # Email address validation with domain control
+│   └── username.go   # Username format validation with styles
 └── testutil/         # Testing utilities
     ├── env.go        # Environment variable test helpers
     ├── flag.go       # Flag parsing test helpers
