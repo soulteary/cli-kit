@@ -95,27 +95,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go environment (temporarily use 1.24 to match golangci-lint)
+      - name: Set up Go environment
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
-
-      - name: Temporarily modify go.mod to match golangci-lint's Go version
-        run: |
-          cp go.mod go.mod.backup
-          sed -i 's/^go 1\.25$/go 1.24/' go.mod
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.7.2
           args: --timeout=5m
           only-new-issues: false
-
-      - name: Restore go.mod
-        if: always()
-        run: |
-          mv go.mod.backup go.mod
 
   # Dependency security scan
   security-scan:
@@ -123,10 +113,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go environment
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
