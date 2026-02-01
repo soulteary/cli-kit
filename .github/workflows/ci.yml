@@ -93,10 +93,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go environment (temporarily use 1.24 to match golangci-lint)
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.24'
 
@@ -106,7 +106,7 @@ jobs:
           sed -i 's/^go 1\.25$/go 1.24/' go.mod
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=5m
