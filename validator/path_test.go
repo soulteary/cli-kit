@@ -79,6 +79,63 @@ func TestContainsTraversalSegment(t *testing.T) {
 	}
 }
 
+func TestIsPathWithinBase(t *testing.T) {
+	base := filepath.Clean("/tmp/base")
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"/tmp/base", true},
+		{"/tmp/base/file.txt", true},
+		{"/tmp/base/sub/dir", true},
+		{"/tmp/base2/file.txt", false},
+		{"/tmp/other", false},
+	}
+
+	for _, tt := range tests {
+		got := isPathWithinBase(filepath.Clean(tt.path), base)
+		if got != tt.want {
+			t.Errorf("isPathWithinBase(%q, %q) = %v, want %v", tt.path, base, got, tt.want)
+		}
+	}
+}
+
+func TestValidatePath_SymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test is platform/permission dependent on Windows")
+	}
+
+	root := t.TempDir()
+	allowedDir := filepath.Join(root, "allowed")
+	outsideDir := filepath.Join(root, "outside")
+	if err := os.MkdirAll(allowedDir, 0o755); err != nil {
+		t.Fatalf("Failed to create allowed dir: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("Failed to create outside dir: %v", err)
+	}
+
+	secretFile := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(secretFile, []byte("secret"), 0o600); err != nil {
+		t.Fatalf("Failed to write secret file: %v", err)
+	}
+
+	linkDir := filepath.Join(allowedDir, "escape")
+	if err := os.Symlink(outsideDir, linkDir); err != nil {
+		t.Skipf("Skipping symlink test due to platform restrictions: %v", err)
+	}
+
+	_, err := ValidatePath(filepath.Join(linkDir, "secret.txt"), &PathOptions{
+		AllowedDirs: []string{allowedDir},
+	})
+	if err == nil {
+		t.Fatal("ValidatePath() should reject symlink escape outside allowed directories")
+	}
+	if !contains(err.Error(), "allowed") {
+		t.Errorf("ValidatePath() error = %v, want error containing %q", err, "allowed")
+	}
+}
+
 func TestValidatePath_EdgeCases(t *testing.T) {
 	// Test with non-existent path (should still work, just normalize)
 	path, err := ValidatePath("./nonexistent.txt", nil)

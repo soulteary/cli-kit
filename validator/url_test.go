@@ -18,17 +18,24 @@ func TestValidateURL(t *testing.T) {
 		// Default options (secure); no resolution to avoid network in unit tests
 		{"valid https", "https://example.com", optsNoResolve, false, ""},
 		{"valid http", "http://example.com", optsNoResolve, false, ""},
+		{"opts without scheme list still block ftp", "ftp://example.com", optsNoResolve, true, "not allowed"},
 		{"empty URL", "", nil, true, "empty"},
 		{"invalid format", "not-a-url", nil, true, "invalid"},
+		{"userinfo blocked", "http://user:pass@example.com", nil, true, "user info"},
 		{"localhost blocked", "http://localhost:8080", nil, true, "localhost"},
 		{"127.0.0.1 blocked", "http://127.0.0.1:8080", nil, true, "localhost"},
 		{"private IP blocked", "http://192.168.1.1:8080", nil, true, "private"},
+		{"metadata IP blocked", "http://169.254.169.254/latest/meta-data", nil, true, "private"},
+		{"carrier-grade NAT blocked", "http://100.64.0.1:8080", nil, true, "private"},
+		{"multicast blocked", "http://224.0.0.1:8080", nil, true, "non-routable"},
 		{"file scheme blocked", "file:///etc/passwd", nil, true, "not allowed"},
 		{"ftp scheme blocked", "ftp://example.com", nil, true, "not allowed"},
 
 		// With options
 		{"localhost allowed", "http://localhost:8080", &URLOptions{AllowLocalhost: true, ResolveHostTimeout: 0}, false, ""},
 		{"private IP allowed", "http://192.168.1.1:8080", &URLOptions{AllowPrivateIP: true}, false, ""},
+		{"metadata IP allowed when private enabled", "http://169.254.169.254/latest/meta-data", &URLOptions{AllowPrivateIP: true}, false, ""},
+		{"multicast still blocked when private enabled", "http://224.0.0.1:8080", &URLOptions{AllowPrivateIP: true}, true, "non-routable"},
 		{"custom schemes", "ftp://example.com", &URLOptions{AllowedSchemes: []string{"ftp", "ftps"}, ResolveHostTimeout: 0}, false, ""},
 		{"custom schemes blocked", "http://example.com", &URLOptions{AllowedSchemes: []string{"ftp"}, ResolveHostTimeout: 0}, true, "not allowed"},
 		{"localhost + private allowed", "http://192.168.1.1:8080", &URLOptions{AllowLocalhost: true, AllowPrivateIP: true}, false, ""},
@@ -75,6 +82,9 @@ func TestIsPrivateIP(t *testing.T) {
 		{"192.169.0.1", "192.169.0.1", false}, // Not 192.168.x.x
 		{"127.0.0.1", "127.0.0.1", true},
 		{"127.255.255.255", "127.255.255.255", true},
+		{"169.254 metadata range", "169.254.169.254", true},
+		{"100.64 shared range", "100.64.0.1", true},
+		{"198.18 benchmark range", "198.18.0.1", true},
 		{"public IP", "8.8.8.8", false},
 		{"public IP 2", "1.1.1.1", false},
 		{"invalid IP", "invalid", false},
@@ -82,6 +92,7 @@ func TestIsPrivateIP(t *testing.T) {
 		{"IPv6 loopback", "::1", true},
 		{"IPv6 link-local unicast", "fe80::1", true},
 		{"IPv6 link-local multicast", "ff02::1", true},
+		{"IPv6 ULA", "fd12:3456:789a::1", true},
 		{"IPv6 public", "2001:4860:4860::8888", false},
 	}
 
