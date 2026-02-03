@@ -31,6 +31,24 @@ func defaultURLOptions() *URLOptions {
 	}
 }
 
+// normalizeURLOptions merges caller-provided options with secure defaults.
+// AllowedSchemes keeps the default allowlist unless explicitly provided (including empty slice).
+func normalizeURLOptions(opts *URLOptions) *URLOptions {
+	normalized := defaultURLOptions()
+	if opts == nil {
+		return normalized
+	}
+
+	if opts.AllowedSchemes != nil {
+		normalized.AllowedSchemes = opts.AllowedSchemes
+	}
+	normalized.AllowLocalhost = opts.AllowLocalhost
+	normalized.AllowPrivateIP = opts.AllowPrivateIP
+	normalized.ResolveHostTimeout = opts.ResolveHostTimeout
+
+	return normalized
+}
+
 // ValidateURL validates a URL string with SSRF protection
 //
 // This function performs strict validation on URLs, including:
@@ -50,15 +68,15 @@ func ValidateURL(urlStr string, opts *URLOptions) error {
 		return fmt.Errorf("URL cannot be empty")
 	}
 
-	// Use default options if not provided
-	if opts == nil {
-		opts = defaultURLOptions()
-	}
+	opts = normalizeURLOptions(opts)
 
 	// Parse URL
 	u, err := url.ParseRequestURI(urlStr)
 	if err != nil {
 		return fmt.Errorf("invalid URL format: %w", err)
+	}
+	if u.User != nil {
+		return fmt.Errorf("URL cannot include user info")
 	}
 
 	// Validate scheme
@@ -122,6 +140,10 @@ func ValidateURL(urlStr string, opts *URLOptions) error {
 
 // checkIPAllowed returns an error if the IP is not allowed by opts (loopback/private checks).
 func checkIPAllowed(ip net.IP, opts *URLOptions) error {
+	if isAlwaysBlockedIP(ip) {
+		return fmt.Errorf("access to non-routable IP address is not allowed: %s", ip.String())
+	}
+
 	if !opts.AllowLocalhost && ip.IsLoopback() {
 		return fmt.Errorf("access to loopback address is not allowed: %s", ip.String())
 	}
@@ -134,23 +156,62 @@ func checkIPAllowed(ip net.IP, opts *URLOptions) error {
 	return nil
 }
 
-// isPrivateIP checks if IP is a private IP address
+// isAlwaysBlockedIP checks IP ranges that should always be rejected for outbound URL targets.
+func isAlwaysBlockedIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+
+	// Unspecified and multicast are never valid remote service targets.
+	if ip.IsUnspecified() || ip.IsMulticast() {
+		return true
+	}
+
+	// 0.0.0.0/8 and 255.255.255.255 are non-routable special addresses.
+	if ip4 := ip.To4(); ip4 != nil {
+		if ip4[0] == 0 || (ip4[0] == 255 && ip4[1] == 255 && ip4[2] == 255 && ip4[3] == 255) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isPrivateIP checks if IP is an internal/non-public address
 //
-// Private IP address ranges:
+// Included ranges:
 // - 10.0.0.0/8 (10.0.0.0 to 10.255.255.255)
 // - 172.16.0.0/12 (172.16.0.0 to 172.31.255.255)
 // - 192.168.0.0/16 (192.168.0.0 to 192.168.255.255)
 // - 127.0.0.0/8 (127.0.0.0 to 127.255.255.255) - loopback address
+// - 100.64.0.0/10 (carrier-grade NAT)
+// - 169.254.0.0/16 (link-local, includes cloud metadata endpoints)
+// - 198.18.0.0/15 (benchmark testing)
+// - IPv6 ULA/link-local/loopback
 func isPrivateIP(ip net.IP) bool {
-	if ip4 := ip.To4(); ip4 != nil {
-		return ip4[0] == 10 ||
-			(ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31) ||
-			(ip4[0] == 192 && ip4[1] == 168) ||
-			ip4[0] == 127
+	if ip == nil {
+		return false
 	}
-	// IPv6 private address check
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+
+	// Built-in checks cover RFC1918 + IPv6 ULA + loopback/link-local ranges.
+	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return true
 	}
+
+	if ip4 := ip.To4(); ip4 != nil {
+		// RFC6598 shared address space for carrier-grade NAT
+		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+			return true
+		}
+		// IPv4 link-local range (often abused for metadata SSRF)
+		if ip4[0] == 169 && ip4[1] == 254 {
+			return true
+		}
+		// Benchmark testing range
+		if ip4[0] == 198 && (ip4[1] == 18 || ip4[1] == 19) {
+			return true
+		}
+	}
+
 	return false
 }

@@ -75,22 +75,31 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		absPath = cleaned
 	}
 
+	// Resolve existing symlinks so policy checks apply to the real on-disk target.
+	// For non-existent paths, keep the cleaned absolute path as-is.
+	resolvedPath, err := resolvePathForPolicy(absPath)
+	if err != nil {
+		return "", err
+	}
+
 	// Check directory restrictions: path must be exactly allowedDir or under it (no prefix bypass)
 	if len(opts.AllowedDirs) > 0 {
 		allowed := false
-		sep := string(filepath.Separator)
 		for _, allowedDir := range opts.AllowedDirs {
 			allowedAbsDir, err := filepath.Abs(allowedDir)
 			if err != nil {
 				continue
 			}
 			allowedAbsDir = filepath.Clean(allowedAbsDir)
-			if absPath == allowedAbsDir {
+
+			if isPathWithinBase(resolvedPath, allowedAbsDir) {
 				allowed = true
 				break
 			}
-			prefix := allowedAbsDir + sep
-			if strings.HasPrefix(absPath, prefix) {
+
+			// Also honor allowed directory symlinks when they exist.
+			allowedResolvedDir, err := filepath.EvalSymlinks(allowedAbsDir)
+			if err == nil && isPathWithinBase(resolvedPath, filepath.Clean(allowedResolvedDir)) {
 				allowed = true
 				break
 			}
@@ -101,7 +110,7 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		}
 	}
 
-	return absPath, nil
+	return resolvedPath, nil
 }
 
 // containsTraversalSegment returns true if path contains ".." as a path segment.
@@ -112,6 +121,30 @@ func containsTraversalSegment(path string) bool {
 		}
 	}
 	return false
+}
+
+// resolvePathForPolicy resolves symlinks when the target exists and returns a cleaned path.
+func resolvePathForPolicy(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return filepath.Clean(resolved), nil
+	}
+	if os.IsNotExist(err) {
+		return filepath.Clean(path), nil
+	}
+	return "", fmt.Errorf("unable to resolve path symlinks: %w", err)
+}
+
+// isPathWithinBase returns true when path == base or path is under base.
+func isPathWithinBase(path, base string) bool {
+	rel, err := filepath.Rel(base, path)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // ErrFileNotFound is returned when a file does not exist
@@ -224,11 +257,11 @@ func ValidateDirWritable(path string) error {
 	}
 
 	// Try to create a temporary file to verify write permissions
-	testFile := filepath.Join(path, ".write_test_"+randomSuffix())
-	f, err := os.Create(testFile)
+	f, err := os.CreateTemp(path, ".write_test_"+randomSuffix()+"_*")
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrDirNotWritable, path)
 	}
+	testFile := f.Name()
 	_ = f.Close()
 	_ = os.Remove(testFile)
 

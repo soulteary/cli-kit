@@ -6,11 +6,13 @@ This document describes security-relevant behavior and recommendations when usin
 
 - **Path traversal**: `ValidatePath` rejects paths containing `..` both in the raw input and after normalization (`filepath.Clean`), to reduce bypass via encoding or platform quirks.
 - **AllowedDirs**: When `AllowedDirs` is set, the resolved path must be exactly an allowed directory or under it; prefix tricks (e.g. `/tmpfoo` when `/tmp` is allowed) are rejected. The error message does not include the list of allowed directories to avoid information disclosure if the error is surfaced to untrusted parties.
-- **Symlinks**: Symlinks are not resolved. Paths under an allowed directory may point outside it via symlinks. For strict containment, resolve symlinks at the call site or use OS-specific checks.
+- **Symlinks**: Existing paths are resolved with `EvalSymlinks` before policy checks. This blocks “allowed-dir symlink escape” cases where a path appears to be under an allowed directory but points elsewhere. For non-existent paths, symlink resolution cannot be fully determined yet.
 
 ## URL validation (validator)
 
-- **SSRF**: `ValidateURL` blocks private IPs and localhost by default. Use `URLOptions.AllowLocalhost` / `AllowPrivateIP` only when intentional.
+- **SSRF**: `ValidateURL` blocks private/internal IPs and localhost by default, including metadata/link-local ranges such as `169.254.0.0/16`.
+- **Always-blocked addresses**: Unspecified and multicast targets are rejected even if `AllowPrivateIP` is enabled.
+- **Userinfo**: URLs containing userinfo (for example `http://user:pass@host`) are rejected to reduce confusion and credential-leak risk.
 - **Resolution**: When `ResolveHostTimeout` is set, hostnames are resolved and all resolved IPs are checked against the same rules.
 - **Redirects**: Validation applies only to the URL as given. It does not protect against HTTP redirects (e.g. to private IPs) when the application later performs the request. Configure the HTTP client to restrict redirects or re-validate the resolved URL if needed.
 
