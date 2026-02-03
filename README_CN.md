@@ -52,6 +52,8 @@ hosts := env.GetStringSlice("HOSTS", []string{"localhost"}, ",")
 
 // Lookup（区分"未设置"和"设置为空"）
 value, ok := env.Lookup("API_KEY")
+
+// 更多类型化获取：GetInt64、GetUint、GetUint64
 ```
 
 ### 命令行参数工具
@@ -79,6 +81,8 @@ if flagutil.HasFlagInOSArgs("verbose") {
 
 // 从文件读取密码（带安全检查）
 password, err := flagutil.ReadPasswordFromFile("/path/to/password.txt")
+
+// 更多：HasFlagInArgs(args, name)、GetFlagValue、GetString、GetInt64、GetUint、GetUint64、GetFloat64
 ```
 
 ### 配置优先级解析
@@ -123,6 +127,16 @@ host, port, err := configutil.ResolveHostPort(
 port, err := configutil.ResolvePort(fs, "port", "PORT", 8080)
 ```
 
+更多 configutil API（优先级均为：CLI > 环境变量 > 默认值）：
+
+- **ResolveInt64** / **ResolveInt64WithValidation** - int64 及带自定义校验
+- **ResolveIntAsString** - 按 int 解析但返回字符串
+- **ResolveStringWithValidator** - 校验函数 `func(string) bool`，返回 string（无效则回退到下一来源）
+- **ResolveStringWithValidation** - 校验函数 `func(string) error`，返回 `(string, error)`（见上）
+- **ResolveStringNonEmpty** - 仅当值非空时采用 CLI/ENV，否则用默认值
+- **ResolveIntWithValidation** - 带自定义校验的 int
+- **ResolveStringSlice** / **ResolveStringSliceMulti** - 逗号分隔的切片（或多源合并）
+
 ### 验证器
 
 ```go
@@ -165,6 +179,15 @@ err := validator.ValidateEnum("production",
     []string{"development", "production", "staging"},
     false, // 不区分大小写
 )
+
+// 数值验证（正数、非负、区间）
+err := validator.ValidatePositive(42)                      // > 0
+err = validator.ValidatePositiveInt64(100)
+err = validator.ValidateNonNegative(0)                    // >= 0
+err = validator.ValidateNonNegativeInt64(0)
+err = validator.ValidateInRange(port, 1, 65535)          // [min, max] 闭区间
+err = validator.ValidateInRangeInt64(n, 0, 100)
+// 错误变量：validator.ErrNotPositive、validator.ErrNegative
 
 // 验证手机号（支持多个地区）
 err := validator.ValidatePhone("13800138000", nil) // 任意格式
@@ -238,35 +261,31 @@ func TestFlags(t *testing.T) {
     testutil.MustParseFlags(fs, []string{"-port", "9090"})
 }
 
-// 表驱动的配置测试
+// 表驱动的配置测试（仅环境变量与默认值）。
+// RunConfigTests 会为每个 case 注入 EnvVars，不会向 resolver 传递 CLIArgs。
+// 若需测试「CLI 参数优先」，请单独写测试并自行 Parse 参数后断言。
 func TestConfigResolution(t *testing.T) {
     cases := []testutil.ConfigTestCase{
         {
-            Name:     "CLI 参数优先",
-            CLIArgs:  []string{"-port", "9090"},
-            EnvVars:  map[string]string{"PORT": "8080"},
-            Expected: 9090,
-        },
-        {
-            Name:     "无 CLI 参数时使用环境变量",
-            CLIArgs:  []string{},
+            Name:     "设置了环境变量时使用环境变量",
             EnvVars:  map[string]string{"PORT": "8080"},
             Expected: 8080,
         },
         {
             Name:     "都未设置时使用默认值",
-            CLIArgs:  []string{},
             EnvVars:  map[string]string{},
             Expected: 3000,
         },
     }
-    
+
     resolver := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
         fs.Int("port", 0, "端口")
-        fs.Parse(tc.CLIArgs)
+        if err := fs.Parse([]string{}); err != nil {
+            return nil, err
+        }
         return configutil.ResolveInt(fs, "port", "PORT", 3000, false), nil
     }
-    
+
     testutil.RunConfigTests(t, cases, resolver)
 }
 ```
@@ -287,6 +306,7 @@ cli-kit/
 │   ├── port.go       # 端口范围验证
 │   ├── hostport.go   # host:port 格式验证
 │   ├── enum.go       # 枚举值验证
+│   ├── number.go     # 数值验证（正数、非负、区间）
 │   ├── phone.go      # 手机号验证（中国/美国/英国/国际格式）
 │   ├── email.go      # 邮箱验证，支持域名白名单/黑名单
 │   └── username.go   # 用户名格式验证，支持多种风格
@@ -313,10 +333,10 @@ cli-kit/
 |------|--------|
 | configutil | 100% |
 | env | 100% |
-| flagutil | 98.7% |
-| validator | 98.1% |
-| testutil | 83.7% |
-| **总计** | **97.1%** |
+| flagutil | 100% |
+| validator | 91.9% |
+| testutil | 86.7% |
+| **总计** | **94.6%** |
 
 运行测试并查看覆盖率：
 
@@ -327,7 +347,7 @@ go tool cover -func=coverage.out
 
 ## 环境要求
 
-- Go 1.21 或更高版本
+- Go 1.25 或更高版本
 
 ## 许可证
 

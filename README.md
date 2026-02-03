@@ -52,6 +52,8 @@ hosts := env.GetStringSlice("HOSTS", []string{"localhost"}, ",")
 
 // Lookup (distinguish between not set and empty)
 value, ok := env.Lookup("API_KEY")
+
+// More typed getters: GetInt64, GetUint, GetUint64
 ```
 
 ### Flag Utilities
@@ -79,6 +81,8 @@ if flagutil.HasFlagInOSArgs("verbose") {
 
 // Read password from file (with security checks)
 password, err := flagutil.ReadPasswordFromFile("/path/to/password.txt")
+
+// More: HasFlagInArgs(args, name), GetFlagValue, GetString, GetInt64, GetUint, GetUint64, GetFloat64
 ```
 
 ### Configuration Resolution
@@ -123,6 +127,16 @@ host, port, err := configutil.ResolveHostPort(
 port, err := configutil.ResolvePort(fs, "port", "PORT", 8080)
 ```
 
+Additional configutil APIs (same priority: CLI > ENV > default):
+
+- **ResolveInt64** / **ResolveInt64WithValidation** - int64 and with custom validator
+- **ResolveIntAsString** - resolve as int but return string
+- **ResolveStringWithValidator** - validator `func(string) bool`, returns string (invalid falls back to next source)
+- **ResolveStringWithValidation** - validator `func(string) error`, returns `(string, error)` (documented above)
+- **ResolveStringNonEmpty** - use CLI/ENV only when value is non-empty, else default
+- **ResolveIntWithValidation** - int with custom validation
+- **ResolveStringSlice** / **ResolveStringSliceMulti** - slice from comma-separated (or multi-source merge)
+
 ### Validators
 
 ```go
@@ -165,6 +179,15 @@ err := validator.ValidateEnum("production",
     []string{"development", "production", "staging"},
     false, // case-insensitive
 )
+
+// Validate numbers (positive, non-negative, range)
+err := validator.ValidatePositive(42)                      // > 0
+err = validator.ValidatePositiveInt64(100)
+err = validator.ValidateNonNegative(0)                    // >= 0
+err = validator.ValidateNonNegativeInt64(0)
+err = validator.ValidateInRange(port, 1, 65535)          // [min, max] inclusive
+err = validator.ValidateInRangeInt64(n, 0, 100)
+// Errors: validator.ErrNotPositive, validator.ErrNegative
 
 // Validate phone number (supports multiple regions)
 err := validator.ValidatePhone("13800138000", nil) // Any format
@@ -238,35 +261,31 @@ func TestFlags(t *testing.T) {
     testutil.MustParseFlags(fs, []string{"-port", "9090"})
 }
 
-// Table-driven configuration tests
+// Table-driven configuration tests (ENV and default only).
+// RunConfigTests injects EnvVars for each case; it does NOT pass CLIArgs to the resolver.
+// To test "CLI flag takes priority", use a separate test that parses flags and asserts.
 func TestConfigResolution(t *testing.T) {
     cases := []testutil.ConfigTestCase{
         {
-            Name:     "CLI flag takes priority",
-            CLIArgs:  []string{"-port", "9090"},
-            EnvVars:  map[string]string{"PORT": "8080"},
-            Expected: 9090,
-        },
-        {
-            Name:     "ENV used when no CLI flag",
-            CLIArgs:  []string{},
+            Name:     "ENV used when set",
             EnvVars:  map[string]string{"PORT": "8080"},
             Expected: 8080,
         },
         {
             Name:     "Default used when neither set",
-            CLIArgs:  []string{},
             EnvVars:  map[string]string{},
             Expected: 3000,
         },
     }
-    
+
     resolver := func(fs *flag.FlagSet, envVars map[string]string) (interface{}, error) {
         fs.Int("port", 0, "Port")
-        fs.Parse(tc.CLIArgs)
+        if err := fs.Parse([]string{}); err != nil {
+            return nil, err
+        }
         return configutil.ResolveInt(fs, "port", "PORT", 3000, false), nil
     }
-    
+
     testutil.RunConfigTests(t, cases, resolver)
 }
 ```
@@ -287,6 +306,7 @@ cli-kit/
 │   ├── port.go       # Port range validation
 │   ├── hostport.go   # Host:port format validation
 │   ├── enum.go       # Enum value validation
+│   ├── number.go     # Numeric validation (positive, non-negative, range)
 │   ├── phone.go      # Phone number validation (CN/US/UK/International)
 │   ├── email.go      # Email address validation with domain control
 │   └── username.go   # Username format validation with styles
@@ -313,10 +333,10 @@ This project maintains high test coverage:
 |---------|----------|
 | configutil | 100% |
 | env | 100% |
-| flagutil | 98.7% |
-| validator | 98.1% |
-| testutil | 83.7% |
-| **Total** | **97.1%** |
+| flagutil | 100% |
+| validator | 91.9% |
+| testutil | 86.7% |
+| **Total** | **94.6%** |
 
 Run tests with coverage:
 
@@ -327,7 +347,7 @@ go tool cover -func=coverage.out
 
 ## Requirements
 
-- Go 1.21 or later
+- Go 1.25 or later
 
 ## License
 
