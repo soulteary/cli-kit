@@ -6,6 +6,8 @@ import (
 )
 
 func TestValidateURL(t *testing.T) {
+	// optsNoResolve disables DNS resolution so tests don't require network
+	optsNoResolve := &URLOptions{ResolveHostTimeout: 0}
 	tests := []struct {
 		name      string
 		urlStr    string
@@ -13,9 +15,9 @@ func TestValidateURL(t *testing.T) {
 		wantErr   bool
 		errSubstr string
 	}{
-		// Default options (secure)
-		{"valid https", "https://example.com", nil, false, ""},
-		{"valid http", "http://example.com", nil, false, ""},
+		// Default options (secure); no resolution to avoid network in unit tests
+		{"valid https", "https://example.com", optsNoResolve, false, ""},
+		{"valid http", "http://example.com", optsNoResolve, false, ""},
 		{"empty URL", "", nil, true, "empty"},
 		{"invalid format", "not-a-url", nil, true, "invalid"},
 		{"localhost blocked", "http://localhost:8080", nil, true, "localhost"},
@@ -25,12 +27,12 @@ func TestValidateURL(t *testing.T) {
 		{"ftp scheme blocked", "ftp://example.com", nil, true, "not allowed"},
 
 		// With options
-		{"localhost allowed", "http://localhost:8080", &URLOptions{AllowLocalhost: true}, false, ""},
+		{"localhost allowed", "http://localhost:8080", &URLOptions{AllowLocalhost: true, ResolveHostTimeout: 0}, false, ""},
 		{"private IP allowed", "http://192.168.1.1:8080", &URLOptions{AllowPrivateIP: true}, false, ""},
-		{"custom schemes", "ftp://example.com", &URLOptions{AllowedSchemes: []string{"ftp", "ftps"}}, false, ""},
-		{"custom schemes blocked", "http://example.com", &URLOptions{AllowedSchemes: []string{"ftp"}}, true, "not allowed"},
+		{"custom schemes", "ftp://example.com", &URLOptions{AllowedSchemes: []string{"ftp", "ftps"}, ResolveHostTimeout: 0}, false, ""},
+		{"custom schemes blocked", "http://example.com", &URLOptions{AllowedSchemes: []string{"ftp"}, ResolveHostTimeout: 0}, true, "not allowed"},
 		{"localhost + private allowed", "http://192.168.1.1:8080", &URLOptions{AllowLocalhost: true, AllowPrivateIP: true}, false, ""},
-		{"empty schemes allowed", "http://example.com", &URLOptions{AllowedSchemes: []string{}}, false, ""},
+		{"empty schemes allowed", "http://example.com", &URLOptions{AllowedSchemes: []string{}, ResolveHostTimeout: 0}, false, ""},
 		{"no host", "http://", nil, true, "host"},
 		{"IPv6 loopback blocked", "http://[::1]:8080", nil, true, "localhost"},
 		{"IPv6 loopback allowed", "http://[::1]:8080", &URLOptions{AllowLocalhost: true}, false, ""},

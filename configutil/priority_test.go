@@ -1136,6 +1136,55 @@ func TestResolveStringSliceMulti(t *testing.T) {
 			t.Errorf("ResolveStringSliceMulti() length = %d, want %d", len(got), len(expected))
 		}
 	})
+
+	t.Run("ENV used when flag set but currentFlagValue empty", func(t *testing.T) {
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		fs.String("test-flag", "", "test flag")
+		setEnv(t, "TEST_ENV", "from_env_a,from_env_b")
+		defer unsetEnv(t, "TEST_ENV")
+
+		if err := fs.Parse([]string{"--test-flag", "x"}); err != nil {
+			t.Fatalf("fs.Parse() failed: %v", err)
+		}
+
+		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", []string{}, []string{"default"}, ",")
+		expected := []string{"from_env_a", "from_env_b"}
+		if len(got) != len(expected) || (len(got) > 0 && (got[0] != expected[0] || got[1] != expected[1])) {
+			t.Errorf("ResolveStringSliceMulti() = %v, want %v", got, expected)
+		}
+	})
+
+	t.Run("Default when ENV set but parses to empty", func(t *testing.T) {
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		fs.String("test-flag", "", "test flag")
+		setEnv(t, "TEST_ENV_MULTI_EMPTY", "  ,  ,  ")
+		defer unsetEnv(t, "TEST_ENV_MULTI_EMPTY")
+
+		if err := fs.Parse([]string{}); err != nil {
+			t.Fatalf("fs.Parse() failed: %v", err)
+		}
+
+		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_MULTI_EMPTY", []string{}, []string{"default"}, ",")
+		if len(got) != 1 || got[0] != "default" {
+			t.Errorf("ResolveStringSliceMulti() = %v, want [default]", got)
+		}
+	})
+
+	t.Run("Empty separator defaults to comma", func(t *testing.T) {
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		fs.String("test-flag", "", "test flag")
+		setEnv(t, "TEST_ENV_SEP", "a,b,c")
+		defer unsetEnv(t, "TEST_ENV_SEP")
+
+		if err := fs.Parse([]string{}); err != nil {
+			t.Fatalf("fs.Parse() failed: %v", err)
+		}
+
+		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_SEP", []string{}, []string{"default"}, "")
+		if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+			t.Errorf("ResolveStringSliceMulti() with empty sep = %v, want [a b c]", got)
+		}
+	})
 }
 
 func TestResolveEnum(t *testing.T) {

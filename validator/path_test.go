@@ -3,6 +3,7 @@ package validator
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -31,6 +32,7 @@ func TestValidatePath(t *testing.T) {
 		{"path in allowed dir", cwd, &PathOptions{AllowedDirs: []string{cwd}}, false, ""},
 		{"path outside allowed dir", "/tmp", &PathOptions{AllowedDirs: []string{cwd}}, true, "allowed"},
 		{"path in one of allowed dirs", cwd, &PathOptions{AllowedDirs: []string{"/tmp", cwd}}, false, ""},
+		{"path prefix bypass rejected", "/tmpfoo/bar", &PathOptions{AllowedDirs: []string{"/tmp"}}, true, "allowed"},
 
 		// With traversal check disabled
 		{"traversal check disabled", "../test.txt", &PathOptions{CheckTraversal: false}, false, ""},
@@ -54,6 +56,26 @@ func TestValidatePath(t *testing.T) {
 				t.Errorf("ValidatePath(%q, %+v) = %q, want absolute path", tt.path, tt.opts, got)
 			}
 		})
+	}
+}
+
+func TestContainsTraversalSegment(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"/a/b/c", false},
+		{"/a/../b", true},
+		{"..", true},
+		{"a/..", true},
+		{"", false},
+		{string(filepath.Separator) + "..", true},
+	}
+	for _, tt := range tests {
+		got := containsTraversalSegment(tt.path)
+		if got != tt.want {
+			t.Errorf("containsTraversalSegment(%q) = %v, want %v", tt.path, got, tt.want)
+		}
 	}
 }
 
@@ -115,6 +137,16 @@ func TestValidateFileExists(t *testing.T) {
 		{"empty path", "", true, nil},
 	}
 
+	// Path that causes non-IsNotExist error (e.g. NUL in path on Unix)
+	if runtime.GOOS != "windows" {
+		tests = append(tests, struct {
+			name    string
+			path    string
+			wantErr bool
+			errType error
+		}{"invalid path NUL", "\x00", true, nil})
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateFileExists(tt.path)
@@ -154,6 +186,28 @@ func TestValidateFileReadable(t *testing.T) {
 			}
 		})
 	}
+
+	// File exists but not readable (no read permission) - covers os.Open failure path
+	if runtime.GOOS != "windows" {
+		noReadFile, err := os.CreateTemp("", "test_noread_*")
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		_, _ = noReadFile.WriteString("x")
+		_ = noReadFile.Close()
+		path := noReadFile.Name()
+		defer func() {
+			_ = os.Chmod(path, 0o644)
+			_ = os.Remove(path)
+		}()
+		if err := os.Chmod(path, 0o000); err != nil {
+			t.Skipf("Cannot chmod 0 for test: %v", err)
+		}
+		err = ValidateFileReadable(path)
+		if err == nil {
+			t.Error("ValidateFileReadable() on non-readable file want error, got nil")
+		}
+	}
 }
 
 func TestValidateDirExists(t *testing.T) {
@@ -183,6 +237,14 @@ func TestValidateDirExists(t *testing.T) {
 		{"non-existent directory", "/nonexistent/path/to/dir", true, ErrDirNotFound},
 		{"file instead of directory", tmpFilePath, true, ErrNotADirectory},
 		{"empty path", "", true, nil},
+	}
+	if runtime.GOOS != "windows" {
+		tests = append(tests, struct {
+			name    string
+			path    string
+			wantErr bool
+			errType error
+		}{"invalid path NUL", "\x00", true, nil})
 	}
 
 	for _, tt := range tests {
@@ -220,5 +282,22 @@ func TestValidateDirWritable(t *testing.T) {
 				t.Errorf("ValidateDirWritable(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
 			}
 		})
+	}
+
+	// Read-only directory: Create should fail (covers ErrDirNotWritable path)
+	if runtime.GOOS != "windows" {
+		readOnlyDir, err := os.MkdirTemp("", "test_readonly_*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer func() { _ = os.RemoveAll(readOnlyDir) }()
+		if err := os.Chmod(readOnlyDir, 0o555); err != nil {
+			t.Skipf("Cannot chmod read-only for test: %v", err)
+		}
+		err = ValidateDirWritable(readOnlyDir)
+		if err == nil {
+			t.Error("ValidateDirWritable() on read-only dir want error, got nil")
+		}
+		_ = os.Chmod(readOnlyDir, 0o755)
 	}
 }

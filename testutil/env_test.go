@@ -1,9 +1,14 @@
 package testutil
 
 import (
+	"errors"
 	"os"
 	"testing"
 )
+
+func isErrInvalidEnvKey(err error) bool {
+	return errors.Is(err, ErrInvalidEnvKey)
+}
 
 func TestEnvManager(t *testing.T) {
 	t.Run("Set and Restore", func(t *testing.T) {
@@ -167,6 +172,54 @@ func TestEnvManager(t *testing.T) {
 		// SetMultiple should handle empty map
 		if err := manager.SetMultiple(map[string]string{}); err != nil {
 			t.Errorf("SetMultiple() with empty map error = %v, want nil", err)
+		}
+	})
+
+	t.Run("Set with empty key returns error", func(t *testing.T) {
+		manager := NewEnvManager()
+		defer manager.Cleanup()
+		if err := manager.Set("", "value"); err == nil {
+			t.Error("Set() with empty key want error, got nil")
+		} else if err != ErrInvalidEnvKey && !isErrInvalidEnvKey(err) {
+			t.Errorf("Set() with empty key want ErrInvalidEnvKey, got %v", err)
+		}
+	})
+
+	t.Run("Unset with empty key returns error", func(t *testing.T) {
+		manager := NewEnvManager()
+		defer manager.Cleanup()
+		if err := manager.Unset(""); err == nil {
+			t.Error("Unset() with empty key want error, got nil")
+		} else if err != ErrInvalidEnvKey && !isErrInvalidEnvKey(err) {
+			t.Errorf("Unset() with empty key want ErrInvalidEnvKey, got %v", err)
+		}
+	})
+
+	t.Run("SetMultiple with empty key returns error", func(t *testing.T) {
+		manager := NewEnvManager()
+		defer manager.Cleanup()
+		if err := manager.SetMultiple(map[string]string{"": "v"}); err == nil {
+			t.Error("SetMultiple() with empty key want error, got nil")
+		} else if err != ErrInvalidEnvKey && !isErrInvalidEnvKey(err) {
+			t.Errorf("SetMultiple() with empty key want ErrInvalidEnvKey, got %v", err)
+		}
+	})
+
+	t.Run("Set with NUL key returns error", func(t *testing.T) {
+		manager := NewEnvManager()
+		defer manager.Cleanup()
+		if err := manager.Set("\x00", "value"); err == nil {
+			t.Error("Set() with NUL key want error, got nil")
+		} else if !isErrInvalidEnvKey(err) {
+			t.Errorf("Set() with NUL key want ErrInvalidEnvKey, got %v", err)
+		}
+	})
+
+	t.Run("Clear with no variables", func(t *testing.T) {
+		manager := NewEnvManager()
+		defer manager.Cleanup()
+		if err := manager.Clear(); err != nil {
+			t.Errorf("Clear() with no variables = %v, want nil", err)
 		}
 	})
 

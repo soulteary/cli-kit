@@ -1,10 +1,12 @@
 package validator
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // URLOptions configures URL validation behavior
@@ -15,14 +17,17 @@ type URLOptions struct {
 	AllowLocalhost bool
 	// AllowPrivateIP allows private IP addresses (default: false)
 	AllowPrivateIP bool
+	// ResolveHostTimeout enables DNS resolution for hostnames and sets timeout; 0 disables resolution (default: 5s)
+	ResolveHostTimeout time.Duration
 }
 
 // defaultURLOptions returns default URL validation options
 func defaultURLOptions() *URLOptions {
 	return &URLOptions{
-		AllowedSchemes: []string{"http", "https"},
-		AllowLocalhost: false,
-		AllowPrivateIP: false,
+		AllowedSchemes:     []string{"http", "https"},
+		AllowLocalhost:     false,
+		AllowPrivateIP:     false,
+		ResolveHostTimeout: 5 * time.Second,
 	}
 }
 
@@ -84,25 +89,48 @@ func ValidateURL(urlStr string, opts *URLOptions) error {
 		}
 	}
 
-	// Parse IP address
+	// Parse IP address or resolve hostname for SSRF protection
 	ip := net.ParseIP(host)
 	if ip != nil {
-		// Check loopback
-		if !opts.AllowLocalhost && ip.IsLoopback() {
-			return fmt.Errorf("access to loopback address is not allowed: %s", ip.String())
+		if err := checkIPAllowed(ip, opts); err != nil {
+			return err
 		}
+		return nil
+	}
 
-		// Check private IP (skip if it's a loopback and localhost is allowed)
-		if !opts.AllowPrivateIP && isPrivateIP(ip) {
-			// If localhost is allowed and this is a loopback IP, don't reject it
-			if opts.AllowLocalhost && ip.IsLoopback() {
-				// Allow loopback when localhost is allowed
-			} else {
-				return fmt.Errorf("access to private IP address is not allowed: %s", ip.String())
+	// Host is a hostname: resolve and check all resolved IPs when timeout is set
+	if opts.ResolveHostTimeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), opts.ResolveHostTimeout)
+		defer cancel()
+		resolver := &net.Resolver{}
+		addrs, err := resolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host %q: %w", host, err)
+		}
+		if len(addrs) == 0 {
+			return fmt.Errorf("host %q resolved to no addresses", host)
+		}
+		for _, ipAddr := range addrs {
+			if err := checkIPAllowed(ipAddr.IP, opts); err != nil {
+				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+// checkIPAllowed returns an error if the IP is not allowed by opts (loopback/private checks).
+func checkIPAllowed(ip net.IP, opts *URLOptions) error {
+	if !opts.AllowLocalhost && ip.IsLoopback() {
+		return fmt.Errorf("access to loopback address is not allowed: %s", ip.String())
+	}
+	if !opts.AllowPrivateIP && isPrivateIP(ip) {
+		if opts.AllowLocalhost && ip.IsLoopback() {
+			return nil
+		}
+		return fmt.Errorf("access to private IP address is not allowed: %s", ip.String())
+	}
 	return nil
 }
 
