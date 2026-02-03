@@ -3,7 +3,11 @@ package testutil
 import (
 	"fmt"
 	"os"
+	"strings"
 )
+
+// ErrInvalidEnvKey is returned when an environment variable key is empty or invalid
+var ErrInvalidEnvKey = fmt.Errorf("environment variable key cannot be empty or contain NUL")
 
 // EnvManager manages environment variables for testing
 // It saves original values and can restore them after tests
@@ -18,8 +22,22 @@ func NewEnvManager() *EnvManager {
 	}
 }
 
+// validateEnvKey returns an error if the key is empty or contains NUL (unsafe on many systems)
+func validateEnvKey(key string) error {
+	if key == "" {
+		return fmt.Errorf("%w", ErrInvalidEnvKey)
+	}
+	if strings.ContainsRune(key, 0) {
+		return fmt.Errorf("%w", ErrInvalidEnvKey)
+	}
+	return nil
+}
+
 // Set sets an environment variable and saves the original value
 func (m *EnvManager) Set(key, value string) error {
+	if err := validateEnvKey(key); err != nil {
+		return err
+	}
 	// Save original value if not already saved
 	if _, exists := m.original[key]; !exists {
 		m.original[key] = os.Getenv(key)
@@ -29,6 +47,9 @@ func (m *EnvManager) Set(key, value string) error {
 
 // Unset unsets an environment variable and saves the original value
 func (m *EnvManager) Unset(key string) error {
+	if err := validateEnvKey(key); err != nil {
+		return err
+	}
 	// Save original value if not already saved
 	if _, exists := m.original[key]; !exists {
 		m.original[key] = os.Getenv(key)
@@ -61,6 +82,9 @@ func (m *EnvManager) Cleanup() {
 // SetMultiple sets multiple environment variables at once
 func (m *EnvManager) SetMultiple(vars map[string]string) error {
 	for key, value := range vars {
+		if err := validateEnvKey(key); err != nil {
+			return err
+		}
 		if err := m.Set(key, value); err != nil {
 			return err
 		}

@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,7 +31,7 @@ func defaultPathOptions() *PathOptions {
 // ValidatePath validates a file path to prevent path traversal attacks
 //
 // This function validates file paths, including:
-// - Path traversal detection (..)
+// - Path traversal detection (..), including after normalization to resist bypasses
 // - Absolute vs relative path handling
 // - Optional directory restrictions
 //
@@ -63,25 +65,53 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		return "", fmt.Errorf("unable to parse path: %w", err)
 	}
 
-	// Check directory restrictions
+	// Security: after normalization, ensure no ".." segment remains (guards against
+	// encoding/unicode bypasses or platform quirks that might bypass the string check)
+	if opts.CheckTraversal {
+		cleaned := filepath.Clean(absPath)
+		if containsTraversalSegment(cleaned) {
+			return "", fmt.Errorf("path cannot contain path traversal characters (..)")
+		}
+		absPath = cleaned
+	}
+
+	// Check directory restrictions: path must be exactly allowedDir or under it (no prefix bypass)
 	if len(opts.AllowedDirs) > 0 {
 		allowed := false
+		sep := string(filepath.Separator)
 		for _, allowedDir := range opts.AllowedDirs {
 			allowedAbsDir, err := filepath.Abs(allowedDir)
 			if err != nil {
 				continue
 			}
-			if strings.HasPrefix(absPath, allowedAbsDir) {
+			allowedAbsDir = filepath.Clean(allowedAbsDir)
+			if absPath == allowedAbsDir {
+				allowed = true
+				break
+			}
+			prefix := allowedAbsDir + sep
+			if strings.HasPrefix(absPath, prefix) {
 				allowed = true
 				break
 			}
 		}
 		if !allowed {
-			return "", fmt.Errorf("path must be under allowed directories: %v", opts.AllowedDirs)
+			// Do not include AllowedDirs in error to avoid leaking allowed paths to callers (e.g. API responses)
+			return "", fmt.Errorf("path is not under allowed directories")
 		}
 	}
 
 	return absPath, nil
+}
+
+// containsTraversalSegment returns true if path contains ".." as a path segment.
+func containsTraversalSegment(path string) bool {
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrFileNotFound is returned when a file does not exist
@@ -205,7 +235,11 @@ func ValidateDirWritable(path string) error {
 	return nil
 }
 
-// randomSuffix generates a simple random suffix for test files
+// randomSuffix generates a random suffix for write-test filenames to avoid predictability and races.
 func randomSuffix() string {
-	return fmt.Sprintf("%d", os.Getpid())
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", os.Getpid())
+	}
+	return hex.EncodeToString(b)
 }

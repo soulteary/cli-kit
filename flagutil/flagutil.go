@@ -3,10 +3,11 @@ package flagutil
 import (
 	"flag"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/soulteary/cli-kit/validator"
 )
 
 // HasFlag checks if a command-line flag is set in the given FlagSet
@@ -154,24 +155,21 @@ func GetDuration(fs *flag.FlagSet, name string, defaultValue time.Duration) time
 	return defaultValue
 }
 
-// ReadPasswordFromFile reads password from file (security improvement)
-// File path should be absolute path or relative to working directory
-// File content will have leading and trailing whitespace trimmed
+// ReadPasswordFromFile reads password from file (security improvement).
+// Path is validated with path traversal check; relative paths are resolved to absolute.
+// File content is trimmed of leading and trailing whitespace.
 func ReadPasswordFromFile(filePath string) (string, error) {
-	// Security check: ensure file path is relative or absolute path, prevent path traversal attacks
-	absPath, err := filepath.Abs(filePath)
+	// Security: reject path traversal and resolve to absolute path
+	safePath, err := validator.ValidatePath(filePath, &validator.PathOptions{CheckTraversal: true})
 	if err != nil {
 		return "", err
 	}
 
-	// Read file content
-	// #nosec G304 -- file path has been validated via filepath.Abs, is safe
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(safePath)
 	if err != nil {
 		return "", err
 	}
 
-	// Trim leading and trailing whitespace
 	password := strings.TrimSpace(string(data))
 	return password, nil
 }

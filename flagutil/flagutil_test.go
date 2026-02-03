@@ -339,6 +339,13 @@ func TestReadPasswordFromFile_Nonexistent(t *testing.T) {
 	}
 }
 
+func TestReadPasswordFromFile_PathTraversal(t *testing.T) {
+	_, err := ReadPasswordFromFile("../../../etc/passwd")
+	if err == nil {
+		t.Error("ReadPasswordFromFile() should return error for path traversal")
+	}
+}
+
 func TestReadPasswordFromFile_AbsError(t *testing.T) {
 	// Test filepath.Abs error branch by using an invalid path
 	// On some systems, very long paths or special characters might cause Abs to fail

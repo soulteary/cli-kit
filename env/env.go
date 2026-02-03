@@ -21,7 +21,9 @@ func Has(key string) bool {
 	return ok
 }
 
-// Get retrieves an environment variable value, returning defaultValue if not set
+// Get retrieves an environment variable value, returning defaultValue if the variable
+// is not set or is set to the empty string. To distinguish "not set" from "set to empty",
+// use Lookup or Has.
 func Get(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
