@@ -13,6 +13,8 @@ import (
 type PathOptions struct {
 	// AllowRelative allows relative paths (default: true)
 	AllowRelative bool
+	// AllowRelativeSet indicates AllowRelative was explicitly set (default: false)
+	AllowRelativeSet bool
 	// AllowedDirs restricts paths to specific directories (default: empty, no restriction)
 	AllowedDirs []string
 	// CheckTraversal checks for path traversal attacks (default: true)
@@ -23,9 +25,27 @@ type PathOptions struct {
 func defaultPathOptions() *PathOptions {
 	return &PathOptions{
 		AllowRelative:  true,
+		AllowRelativeSet: false,
 		AllowedDirs:    nil,
 		CheckTraversal: true,
 	}
+}
+
+// normalizePathOptions merges caller-provided options with defaults.
+// AllowRelative defaults to true unless explicitly set via AllowRelativeSet.
+func normalizePathOptions(opts *PathOptions) *PathOptions {
+	normalized := defaultPathOptions()
+	if opts == nil {
+		return normalized
+	}
+
+	normalized.AllowedDirs = opts.AllowedDirs
+	normalized.CheckTraversal = opts.CheckTraversal
+	if opts.AllowRelativeSet || opts.AllowRelative {
+		normalized.AllowRelative = opts.AllowRelative
+	}
+
+	return normalized
 }
 
 // ValidatePath validates a file path to prevent path traversal attacks
@@ -47,10 +67,7 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		return "", fmt.Errorf("path cannot be empty")
 	}
 
-	// Use default options if not provided
-	if opts == nil {
-		opts = defaultPathOptions()
-	}
+	opts = normalizePathOptions(opts)
 
 	// Enforce absolute path requirement when relative paths are disallowed.
 	if !opts.AllowRelative && !filepath.IsAbs(path) {

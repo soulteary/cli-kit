@@ -174,7 +174,7 @@ pathOpts := &validator.PathOptions{
 }
 absPath, err := validator.ValidatePath("../etc/passwd", pathOpts) // 错误：路径遍历攻击
 
-// 注意：使用 PathOptions 时请显式设置 AllowRelative，因为布尔零值为 false。
+// 注意：若需禁止相对路径，请设置 AllowRelative=false 且 AllowRelativeSet=true。
 
 // 验证枚举
 err := validator.ValidateEnum("production", 

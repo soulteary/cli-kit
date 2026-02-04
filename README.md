@@ -174,7 +174,7 @@ pathOpts := &validator.PathOptions{
 }
 absPath, err := validator.ValidatePath("../etc/passwd", pathOpts) // Error: path traversal
 
-// Note: when supplying PathOptions, set AllowRelative explicitly because the zero value is false.
+// Note: when disallowing relative paths, set AllowRelative=false and AllowRelativeSet=true.
 
 // Validate enum
 err := validator.ValidateEnum("production", 
