@@ -52,6 +52,11 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		opts = defaultPathOptions()
 	}
 
+	// Enforce absolute path requirement when relative paths are disallowed.
+	if !opts.AllowRelative && !filepath.IsAbs(path) {
+		return "", fmt.Errorf("relative paths are not allowed")
+	}
+
 	// Check for path traversal in original path before converting to absolute
 	if opts.CheckTraversal {
 		if strings.Contains(path, "..") {

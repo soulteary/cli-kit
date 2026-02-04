@@ -27,6 +27,8 @@ func TestValidatePath(t *testing.T) {
 		{"empty path", "", nil, true, "empty"},
 		{"path with ..", "../test.txt", nil, true, "traversal"},
 		{"path with multiple ..", "../../etc/passwd", nil, true, "traversal"},
+		{"relative path disallowed", "test.txt", &PathOptions{AllowRelative: false}, true, "relative"},
+		{"absolute path allowed when relative disallowed", cwd, &PathOptions{AllowRelative: false}, false, ""},
 
 		// With directory restrictions
 		{"path in allowed dir", cwd, &PathOptions{AllowedDirs: []string{cwd}}, false, ""},
@@ -35,7 +37,7 @@ func TestValidatePath(t *testing.T) {
 		{"path prefix bypass rejected", "/tmpfoo/bar", &PathOptions{AllowedDirs: []string{"/tmp"}}, true, "allowed"},
 
 		// With traversal check disabled
-		{"traversal check disabled", "../test.txt", &PathOptions{CheckTraversal: false}, false, ""},
+		{"traversal check disabled", "../test.txt", &PathOptions{AllowRelative: true, CheckTraversal: false}, false, ""},
 	}
 
 	for _, tt := range tests {
