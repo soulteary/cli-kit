@@ -160,7 +160,10 @@ func GetDuration(fs *flag.FlagSet, name string, defaultValue time.Duration) time
 // File content is trimmed of leading and trailing whitespace.
 func ReadPasswordFromFile(filePath string) (string, error) {
 	// Security: reject path traversal and resolve to absolute path
-	safePath, err := validator.ValidatePath(filePath, &validator.PathOptions{CheckTraversal: true})
+	safePath, err := validator.ValidatePath(filePath, &validator.PathOptions{
+		AllowRelative: true,
+		CheckTraversal: true,
+	})
 	if err != nil {
 		return "", err
 	}
