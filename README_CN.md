@@ -85,6 +85,22 @@ password, err := flagutil.ReadPasswordFromFile("/path/to/password.txt")
 // 更多：HasFlagInArgs(args, name)、GetFlagValue、GetString、GetInt64、GetUint、GetUint64、GetFloat64
 ```
 
+**pflag 支持**：若使用 [spf13/pflag](https://github.com/spf13/pflag)（支持短选项、废弃标记等），可使用同名语义的 `*Pflag` 函数：
+
+```go
+import "github.com/soulteary/cli-kit/flagutil"
+"github.com/spf13/pflag"
+
+fs := pflag.NewFlagSet("app", pflag.ContinueOnError)
+fs.IntP("port", "p", 8080, "服务端口")
+fs.Parse(os.Args)
+
+if flagutil.HasFlagPflag(fs, "port") {
+    port := flagutil.GetIntPflag(fs, "port", 8080)
+}
+// 同样提供：GetStringPflag、GetBoolPflag、GetDurationPflag、GetFlagValuePflag
+```
+
 ### 配置优先级解析
 
 `configutil` 包按照明确的优先级顺序解析配置值：**CLI 参数 > 环境变量 > 默认值**。
@@ -125,6 +141,15 @@ host, port, err := configutil.ResolveHostPort(
 
 // 解析端口并自动验证范围
 port, err := configutil.ResolvePort(fs, "port", "PORT", 8080)
+```
+
+**pflag**：使用 `*pflag.FlagSet` 时可用 `Resolve*Pflag`，语义相同；传空字符串 `envKey` 时仅用 CLI 与默认值（不读环境变量）：
+
+```go
+fs := pflag.NewFlagSet("app", pflag.ContinueOnError)
+// ... 定义并 Parse ...
+port, err := configutil.ResolvePortPflag(fs, "port", "PORT", 8080)
+base := configutil.ResolveBoolPflag(fs, "debug", "", false) // envKey 为空：仅 CLI 或 default
 ```
 
 更多 configutil API（优先级均为：CLI > 环境变量 > 默认值）：

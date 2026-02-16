@@ -85,6 +85,22 @@ password, err := flagutil.ReadPasswordFromFile("/path/to/password.txt")
 // More: HasFlagInArgs(args, name), GetFlagValue, GetString, GetInt64, GetUint, GetUint64, GetFloat64
 ```
 
+**pflag support**: When using [spf13/pflag](https://github.com/spf13/pflag) (short flags, deprecated marks, etc.), use the `*Pflag` helpers with the same semantics:
+
+```go
+import "github.com/soulteary/cli-kit/flagutil"
+"github.com/spf13/pflag"
+
+fs := pflag.NewFlagSet("app", pflag.ContinueOnError)
+fs.IntP("port", "p", 8080, "Server port")
+fs.Parse(os.Args)
+
+if flagutil.HasFlagPflag(fs, "port") {
+    port := flagutil.GetIntPflag(fs, "port", 8080)
+}
+// Also: GetStringPflag, GetBoolPflag, GetDurationPflag, GetFlagValuePflag
+```
+
 ### Configuration Resolution
 
 The `configutil` package resolves configuration values with a clear priority order: **CLI flags > Environment variables > Default values**.
@@ -125,6 +141,15 @@ host, port, err := configutil.ResolveHostPort(
 
 // Resolve port with automatic range validation
 port, err := configutil.ResolvePort(fs, "port", "PORT", 8080)
+```
+
+**pflag**: With `*pflag.FlagSet`, use `Resolve*Pflag` with the same semantics. Pass an empty `envKey` to use only CLI and default (no environment lookup):
+
+```go
+fs := pflag.NewFlagSet("app", pflag.ContinueOnError)
+// ... define and Parse ...
+port, err := configutil.ResolvePortPflag(fs, "port", "PORT", 8080)
+base := configutil.ResolveBoolPflag(fs, "debug", "", false) // empty envKey: CLI or default only
 ```
 
 Additional configutil APIs (same priority: CLI > ENV > default):
