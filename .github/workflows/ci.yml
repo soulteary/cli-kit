@@ -13,7 +13,7 @@ jobs:
   # Code formatting check
   fmt:
     name: Code Formatting Check
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -34,7 +34,7 @@ jobs:
   # Code static analysis
   vet:
     name: Code Static Analysis
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -50,7 +50,7 @@ jobs:
   # Code testing
   test:
     name: Code Testing
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         go-version: ['1.26.0']
@@ -90,7 +90,7 @@ jobs:
   # Code quality check (using golangci-lint)
   lint:
     name: Code Quality Check
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -110,7 +110,7 @@ jobs:
   # Dependency security scan
   security-scan:
     name: Dependency Security Scan
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
