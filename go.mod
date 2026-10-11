@@ -1,5 +1,5 @@
 module github.com/soulteary/cli-kit
 
-go 1.27.0
+go 1.27.2
 
 require github.com/spf13/pflag v1.0.10

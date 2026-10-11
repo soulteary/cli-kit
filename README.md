@@ -553,7 +553,7 @@ uid 0 ignores; those sections skip when the suite runs as root.
 
 ## Requirements
 
-- **Go 1.27+** (`go.mod` declares `go 1.27.0`)
+- **Go 1.27+** (`go.mod` declares `go 1.27.2`)
 - Optional: `github.com/spf13/pflag` for the `*Pflag` helpers
 
 ## License
