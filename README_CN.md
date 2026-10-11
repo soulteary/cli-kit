@@ -532,7 +532,7 @@ go tool cover -func=coverage.out
 
 ## 环境要求
 
-- **Go 1.27+**（`go.mod` 声明 `go 1.27.0`）
+- **Go 1.27+**（`go.mod` 声明 `go 1.27.2`）
 - 可选：`github.com/spf13/pflag`（使用 `*Pflag` 辅助函数时）
 
 ## 许可证
