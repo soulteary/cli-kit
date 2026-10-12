@@ -13,8 +13,8 @@
 | ----- | ----- |
 | gofmt | 100% |
 | go_vet | 100% |
-| gocyclo | 80% |
 | ineffassign | 100% |
+| gocyclo | 80% |
 | license | 100% |
 | misspell | 100% |
 
@@ -22,6 +22,8 @@
 
 ### gocyclo
 
+- `validator/username.go`
+  - Line 84: cyclomatic complexity 21 for function ValidateUsername
 - `validator/email.go`
   - Line 54: cyclomatic complexity 21 for function ValidateEmail
 - `env/env_test.go`
@@ -37,8 +39,6 @@
   - Line 1088: cyclomatic complexity 22 for function TestResolveStringSliceMulti
   - Line 979: cyclomatic complexity 18 for function TestResolveStringSlice
   - Line 790: cyclomatic complexity 17 for function TestResolveStringWithValidation
-- `validator/username.go`
-  - Line 84: cyclomatic complexity 21 for function ValidateUsername
 
 ---
 
