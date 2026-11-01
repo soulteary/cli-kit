@@ -8,7 +8,7 @@
 | Passed | 127 |
 | Failed | 0 |
 | Skipped | 0 |
-| Coverage | 95.09% |
+| Coverage | 95.16% |
 | Threshold | 0.00% |
 
 ### Packages
@@ -19,4 +19,4 @@
 | env | pass | 12 | 0 | 100.00% |
 | flagutil | pass | 23 | 0 | 96.55% |
 | testutil | pass | 6 | 0 | 86.67% |
-| validator | pass | 60 | 0 | 92.80% |
+| validator | pass | 60 | 0 | 93.02% |

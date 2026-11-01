@@ -7,9 +7,9 @@
     "skipped": 0
   },
   "coverage": {
-    "covered_statements": 774,
-    "total_statements": 814,
-    "percentage": 95.09,
+    "covered_statements": 786,
+    "total_statements": 826,
+    "percentage": 95.16,
     "threshold": 0
   },
   "packages": [
@@ -46,7 +46,7 @@
       "status": "pass",
       "tests": 60,
       "failed": 0,
-      "coverage": 92.8
+      "coverage": 93.02
     }
   ],
   "failures": null
