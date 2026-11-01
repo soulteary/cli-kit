@@ -102,6 +102,33 @@ func ValidateEmail(email string, opts *EmailOptions) error {
 		return fmt.Errorf("%w: domain must have a valid TLD", ErrInvalidEmail)
 	}
 
+	return validateEmailDomains(domainPart, opts)
+}
+
+// ValidateEmailSimple validates an email address with default options
+// Convenience function for ValidateEmail(email, nil)
+func ValidateEmailSimple(email string) error {
+	return ValidateEmail(email, nil)
+}
+
+// ValidateEmailWithDomains validates an email and checks against allowed domains
+// Convenience function for ValidateEmail with AllowedDomains option
+func ValidateEmailWithDomains(email string, allowedDomains []string) error {
+	return ValidateEmail(email, &EmailOptions{AllowedDomains: allowedDomains})
+}
+
+// ExtractEmailDomain extracts the domain part from an email address
+// Returns empty string if email is invalid
+func ExtractEmailDomain(email string) string {
+	email = strings.TrimSpace(email)
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[1]
+}
+
+func validateEmailDomains(domainPart string, opts *EmailOptions) error {
 	// Check domain allowlist
 	if len(opts.AllowedDomains) > 0 {
 		domainLower := strings.ToLower(domainPart)
@@ -128,27 +155,4 @@ func ValidateEmail(email string, opts *EmailOptions) error {
 	}
 
 	return nil
-}
-
-// ValidateEmailSimple validates an email address with default options
-// Convenience function for ValidateEmail(email, nil)
-func ValidateEmailSimple(email string) error {
-	return ValidateEmail(email, nil)
-}
-
-// ValidateEmailWithDomains validates an email and checks against allowed domains
-// Convenience function for ValidateEmail with AllowedDomains option
-func ValidateEmailWithDomains(email string, allowedDomains []string) error {
-	return ValidateEmail(email, &EmailOptions{AllowedDomains: allowedDomains})
-}
-
-// ExtractEmailDomain extracts the domain part from an email address
-// Returns empty string if email is invalid
-func ExtractEmailDomain(email string) string {
-	email = strings.TrimSpace(email)
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[1]
 }

@@ -101,18 +101,8 @@ func ValidateURL(urlStr string, opts *URLOptions) error {
 		return fmt.Errorf("URL cannot include user info")
 	}
 
-	// Validate scheme
-	if len(opts.AllowedSchemes) > 0 {
-		schemeAllowed := false
-		for _, allowedScheme := range opts.AllowedSchemes {
-			if strings.EqualFold(u.Scheme, allowedScheme) {
-				schemeAllowed = true
-				break
-			}
-		}
-		if !schemeAllowed {
-			return fmt.Errorf("scheme %q is not allowed, allowed schemes: %v", u.Scheme, opts.AllowedSchemes)
-		}
+	if err := validateURLScheme(u.Scheme, opts.AllowedSchemes); err != nil {
+		return err
 	}
 
 	// Validate host
@@ -141,32 +131,7 @@ func ValidateURL(urlStr string, opts *URLOptions) error {
 		return nil
 	}
 
-	// Host is a hostname: resolve and check every address it maps to.
-	//
-	// NOTE: this is a check-then-use. The caller resolves the name again when
-	// it actually connects, and a short-TTL record can answer differently the
-	// second time (DNS rebinding): public address here, 169.254.169.254 there.
-	// Use SSRFDialControl on the dialer that performs the request to close
-	// that window; ValidateURL alone cannot.
-	if !opts.DisableHostResolution && opts.ResolveHostTimeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), opts.ResolveHostTimeout)
-		defer cancel()
-		resolver := &net.Resolver{}
-		addrs, err := resolver.LookupIPAddr(ctx, host)
-		if err != nil {
-			return fmt.Errorf("failed to resolve host %q: %w", host, err)
-		}
-		if len(addrs) == 0 {
-			return fmt.Errorf("host %q resolved to no addresses", host)
-		}
-		for _, ipAddr := range addrs {
-			if err := checkIPAllowed(ipAddr.IP, opts); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	return validateResolvedHost(host, opts)
 }
 
 // checkIPAllowed returns an error if the IP is not allowed by opts (loopback/private checks).
@@ -229,39 +194,7 @@ func isPrivateIP(ip net.IP) bool {
 		return true
 	}
 
-	if ip4 := ip.To4(); ip4 != nil {
-		// RFC6598 shared address space for carrier-grade NAT
-		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
-			return true
-		}
-		// IPv4 link-local range (often abused for metadata SSRF)
-		if ip4[0] == 169 && ip4[1] == 254 {
-			return true
-		}
-		// Benchmark testing range
-		if ip4[0] == 198 && (ip4[1] == 18 || ip4[1] == 19) {
-			return true
-		}
-		// TEST-NET-1 (192.0.2.0/24) is not a routable destination.
-		if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2 {
-			return true
-		}
-		// IETF protocol assignments (192.0.0.0/24) are mostly non-routable,
-		// but the block carries documented globally reachable exceptions:
-		// 192.0.0.9 (PCP anycast, RFC 7723) and 192.0.0.10 (TURN anycast,
-		// RFC 8155). Blocking the whole /24 forced callers validating URLs
-		// for those services to enable ALL private addresses just to reach a
-		// public anycast endpoint.
-		if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 0 && ip4[3] != 9 && ip4[3] != 10 {
-			return true
-		}
-		// Reserved for future use, 240.0.0.0/4.
-		if ip4[0] >= 240 {
-			return true
-		}
-	}
-
-	return false
+	return isPrivateIPv4(ip.To4())
 }
 
 // SSRFDialControl returns a function for net.Dialer.Control that rejects a
@@ -309,4 +242,92 @@ func SSRFDialControl(opts *URLOptions) func(network, address string, c syscall.R
 		}
 		return checkIPAllowed(ip, normalized)
 	}
+}
+
+func validateResolvedHost(host string, opts *URLOptions) error {
+	// Host is a hostname: resolve and check every address it maps to.
+	//
+	// NOTE: this is a check-then-use. The caller resolves the name again when
+	// it actually connects, and a short-TTL record can answer differently the
+	// second time (DNS rebinding): public address here, 169.254.169.254 there.
+	// Use SSRFDialControl on the dialer that performs the request to close
+	// that window; ValidateURL alone cannot.
+	if !opts.DisableHostResolution && opts.ResolveHostTimeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), opts.ResolveHostTimeout)
+		defer cancel()
+		resolver := &net.Resolver{}
+		addrs, err := resolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host %q: %w", host, err)
+		}
+		if len(addrs) == 0 {
+			return fmt.Errorf("host %q resolved to no addresses", host)
+		}
+		for _, ipAddr := range addrs {
+			if err := checkIPAllowed(ipAddr.IP, opts); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func isPrivateIPv4(ip4 net.IP) bool {
+	if ip4 != nil {
+		// RFC6598 shared address space for carrier-grade NAT
+		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+			return true
+		}
+		// IPv4 link-local range (often abused for metadata SSRF)
+		if ip4[0] == 169 && ip4[1] == 254 {
+			return true
+		}
+		// Benchmark testing range
+		if ip4[0] == 198 && (ip4[1] == 18 || ip4[1] == 19) {
+			return true
+		}
+		return isReservedIPv4(ip4)
+	}
+
+	return false
+}
+
+func isReservedIPv4(ip4 net.IP) bool {
+	// TEST-NET-1 (192.0.2.0/24) is not a routable destination.
+	if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2 {
+		return true
+	}
+	// IETF protocol assignments (192.0.0.0/24) are mostly non-routable,
+	// but the block carries documented globally reachable exceptions:
+	// 192.0.0.9 (PCP anycast, RFC 7723) and 192.0.0.10 (TURN anycast,
+	// RFC 8155). Blocking the whole /24 forced callers validating URLs
+	// for those services to enable ALL private addresses just to reach a
+	// public anycast endpoint.
+	if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 0 && ip4[3] != 9 && ip4[3] != 10 {
+		return true
+	}
+	// Reserved for future use, 240.0.0.0/4.
+	if ip4[0] >= 240 {
+		return true
+	}
+	return false
+}
+
+func validateURLScheme(scheme string, allowedSchemes []string) error {
+	// Validate scheme
+	if len(allowedSchemes) > 0 {
+		schemeAllowed := false
+		for _, allowedScheme := range allowedSchemes {
+			if strings.EqualFold(scheme, allowedScheme) {
+				schemeAllowed = true
+				break
+			}
+		}
+		if !schemeAllowed {
+			return fmt.Errorf("scheme %q is not allowed, allowed schemes: %v", scheme, allowedSchemes)
+		}
+	}
+
+	return nil
 }

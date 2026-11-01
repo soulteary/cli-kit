@@ -795,100 +795,15 @@ func TestResolveStringWithValidation(t *testing.T) {
 		return nil
 	}
 
-	t.Run("Valid CLI value is used", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "valid_env")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("Valid CLI value is used", func(t *testing.T) { testResolveStringWithValidationCase1(t, validator) })
 
-		if err := fs.Parse([]string{"--test-flag", "valid_cli"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
+	t.Run("Invalid CLI value falls back to ENV", func(t *testing.T) { testResolveStringWithValidationCase2(t, validator) })
 
-		got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
-		if err != nil {
-			t.Errorf("ResolveStringWithValidation() error = %v", err)
-		}
-		if got != "valid_cli" {
-			t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_cli")
-		}
-	})
+	t.Run("All sources invalid returns error", func(t *testing.T) { testResolveStringWithValidationCase3(t, validator) })
 
-	t.Run("Invalid CLI value falls back to ENV", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "valid_env")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("Empty ENV value falls back to default", func(t *testing.T) { testResolveStringWithValidationCase4(t, validator) })
 
-		if err := fs.Parse([]string{"--test-flag", "ab"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
-		if err != nil {
-			t.Errorf("ResolveStringWithValidation() error = %v", err)
-		}
-		if got != "valid_env" {
-			t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_env")
-		}
-	})
-
-	t.Run("All sources invalid returns error", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "ab")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{"--test-flag", "xy"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "de", false, validator)
-		if err == nil {
-			t.Error("ResolveStringWithValidation() error = nil, want error")
-		}
-		if got != "de" {
-			t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "de")
-		}
-	})
-
-	t.Run("Empty ENV value falls back to default", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
-		if err != nil {
-			t.Errorf("ResolveStringWithValidation() error = %v", err)
-		}
-		if got != "default" {
-			t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "default")
-		}
-	})
-
-	t.Run("Trimmed ENV value", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "  valid_env  ")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", true, validator)
-		if err != nil {
-			t.Errorf("ResolveStringWithValidation() error = %v", err)
-		}
-		if got != "valid_env" {
-			t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_env")
-		}
-	})
+	t.Run("Trimmed ENV value", func(t *testing.T) { testResolveStringWithValidationCase5(t, validator) })
 }
 
 func TestResolveIntWithValidation(t *testing.T) {
@@ -977,214 +892,31 @@ func TestResolveIntWithValidation(t *testing.T) {
 }
 
 func TestResolveStringSlice(t *testing.T) {
-	t.Run("CLI flag has highest priority", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1,env2,env3")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("CLI flag has highest priority", testResolveStringSliceCLIFlagHasHighestPriority)
 
-		if err := fs.Parse([]string{"--test-flag", "cli_value"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
+	t.Run("Environment variable has priority over default", testResolveStringSliceEnvironmentVariableHasPriorityOverDefault)
 
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
-		if len(got) != 1 || got[0] != "cli_value" {
-			t.Errorf("ResolveStringSlice() = %v, want %v", got, []string{"cli_value"})
-		}
-	})
+	t.Run("Default value used when neither CLI nor ENV set", testResolveStringSliceDefaultValueUsedWhenNeitherCLINorENVSet)
 
-	t.Run("Environment variable has priority over default", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1,env2,env3")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("Custom separator works", testResolveStringSliceCustomSeparatorWorks)
 
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
+	t.Run("Empty separator defaults to comma", testResolveStringSliceEmptySeparatorDefaultsToComma)
 
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
-		expected := []string{"env1", "env2", "env3"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
-		}
-		for i, v := range got {
-			if v != expected[i] {
-				t.Errorf("ResolveStringSlice()[%d] = %v, want %v", i, v, expected[i])
-			}
-		}
-	})
-
-	t.Run("Default value used when neither CLI nor ENV set", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default1", "default2"}, ",")
-		expected := []string{"default1", "default2"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
-		}
-	})
-
-	t.Run("Custom separator works", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1;env2;env3")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ";")
-		expected := []string{"env1", "env2", "env3"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
-		}
-	})
-
-	t.Run("Empty separator defaults to comma", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1,env2")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, "")
-		if len(got) != 2 {
-			t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), 2)
-		}
-	})
-
-	t.Run("Whitespace trimming in ENV values", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", " env1 , env2 , env3 ")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
-		expected := []string{"env1", "env2", "env3"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
-		}
-		for i, v := range got {
-			if v != expected[i] {
-				t.Errorf("ResolveStringSlice()[%d] = %v, want %v", i, v, expected[i])
-			}
-		}
-	})
+	t.Run("Whitespace trimming in ENV values", testResolveStringSliceWhitespaceTrimmingInENVValues)
 }
 
 func TestResolveStringSliceMulti(t *testing.T) {
-	t.Run("CLI flag values have highest priority", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1,env2")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("CLI flag values have highest priority", testResolveStringSliceMultiCLIFlagValuesHaveHighestPriority)
 
-		if err := fs.Parse([]string{"--test-flag", "cli1"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
+	t.Run("ENV used when CLI flag not set", testResolveStringSliceMultiENVUsedWhenCLIFlagNotSet)
 
-		// Simulating multi-value flag where values were collected
-		currentFlagValue := []string{"cli1", "cli2"}
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default"}, ",")
-		if len(got) != 2 || got[0] != "cli1" || got[1] != "cli2" {
-			t.Errorf("ResolveStringSliceMulti() = %v, want %v", got, []string{"cli1", "cli2"})
-		}
-	})
+	t.Run("Default value used when neither CLI nor ENV set", testResolveStringSliceMultiDefaultValueUsedWhenNeitherCLINorENVSet)
 
-	t.Run("ENV used when CLI flag not set", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "env1,env2,env3")
-		defer unsetEnv(t, "TEST_ENV")
+	t.Run("ENV used when flag set but currentFlagValue empty", testResolveStringSliceMultiENVUsedWhenFlagSetButCurrentFlagValueEmpty)
 
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
+	t.Run("Default when ENV set but parses to empty", testResolveStringSliceMultiDefaultWhenENVSetButParsesToEmpty)
 
-		currentFlagValue := []string{}
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default"}, ",")
-		expected := []string{"env1", "env2", "env3"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSliceMulti() length = %d, want %d", len(got), len(expected))
-		}
-	})
-
-	t.Run("Default value used when neither CLI nor ENV set", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		currentFlagValue := []string{}
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default1", "default2"}, ",")
-		expected := []string{"default1", "default2"}
-		if len(got) != len(expected) {
-			t.Errorf("ResolveStringSliceMulti() length = %d, want %d", len(got), len(expected))
-		}
-	})
-
-	t.Run("ENV used when flag set but currentFlagValue empty", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV", "from_env_a,from_env_b")
-		defer unsetEnv(t, "TEST_ENV")
-
-		if err := fs.Parse([]string{"--test-flag", "x"}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", []string{}, []string{"default"}, ",")
-		expected := []string{"from_env_a", "from_env_b"}
-		if len(got) != len(expected) || (len(got) > 0 && (got[0] != expected[0] || got[1] != expected[1])) {
-			t.Errorf("ResolveStringSliceMulti() = %v, want %v", got, expected)
-		}
-	})
-
-	t.Run("Default when ENV set but parses to empty", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV_MULTI_EMPTY", "  ,  ,  ")
-		defer unsetEnv(t, "TEST_ENV_MULTI_EMPTY")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_MULTI_EMPTY", []string{}, []string{"default"}, ",")
-		if len(got) != 1 || got[0] != "default" {
-			t.Errorf("ResolveStringSliceMulti() = %v, want [default]", got)
-		}
-	})
-
-	t.Run("Empty separator defaults to comma", func(t *testing.T) {
-		fs := flag.NewFlagSet("test", flag.ContinueOnError)
-		fs.String("test-flag", "", "test flag")
-		setEnv(t, "TEST_ENV_SEP", "a,b,c")
-		defer unsetEnv(t, "TEST_ENV_SEP")
-
-		if err := fs.Parse([]string{}); err != nil {
-			t.Fatalf("fs.Parse() failed: %v", err)
-		}
-
-		got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_SEP", []string{}, []string{"default"}, "")
-		if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
-			t.Errorf("ResolveStringSliceMulti() with empty sep = %v, want [a b c]", got)
-		}
-	})
+	t.Run("Empty separator defaults to comma", testResolveStringSliceMultiEmptySeparatorDefaultsToComma)
 }
 
 func TestResolveEnum(t *testing.T) {
@@ -1323,4 +1055,306 @@ func TestResolvePort(t *testing.T) {
 			t.Errorf("ResolvePort() = %v, want %v", got, 99999)
 		}
 	})
+}
+
+func testResolveStringSliceCLIFlagHasHighestPriority(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1,env2,env3")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "cli_value"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
+	if len(got) != 1 || got[0] != "cli_value" {
+		t.Errorf("ResolveStringSlice() = %v, want %v", got, []string{"cli_value"})
+	}
+}
+
+func testResolveStringSliceEnvironmentVariableHasPriorityOverDefault(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1,env2,env3")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
+	expected := []string{"env1", "env2", "env3"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
+	}
+	for i, v := range got {
+		if v != expected[i] {
+			t.Errorf("ResolveStringSlice()[%d] = %v, want %v", i, v, expected[i])
+		}
+	}
+}
+
+func testResolveStringSliceDefaultValueUsedWhenNeitherCLINorENVSet(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default1", "default2"}, ",")
+	expected := []string{"default1", "default2"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
+	}
+}
+
+func testResolveStringSliceCustomSeparatorWorks(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1;env2;env3")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ";")
+	expected := []string{"env1", "env2", "env3"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
+	}
+}
+
+func testResolveStringSliceEmptySeparatorDefaultsToComma(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1,env2")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, "")
+	if len(got) != 2 {
+		t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), 2)
+	}
+}
+
+func testResolveStringSliceWhitespaceTrimmingInENVValues(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", " env1 , env2 , env3 ")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSlice(fs, "test-flag", "TEST_ENV", []string{"default"}, ",")
+	expected := []string{"env1", "env2", "env3"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSlice() length = %d, want %d", len(got), len(expected))
+	}
+	for i, v := range got {
+		if v != expected[i] {
+			t.Errorf("ResolveStringSlice()[%d] = %v, want %v", i, v, expected[i])
+		}
+	}
+}
+
+func testResolveStringSliceMultiCLIFlagValuesHaveHighestPriority(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1,env2")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "cli1"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	// Simulating multi-value flag where values were collected
+	currentFlagValue := []string{"cli1", "cli2"}
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default"}, ",")
+	if len(got) != 2 || got[0] != "cli1" || got[1] != "cli2" {
+		t.Errorf("ResolveStringSliceMulti() = %v, want %v", got, []string{"cli1", "cli2"})
+	}
+}
+
+func testResolveStringSliceMultiENVUsedWhenCLIFlagNotSet(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "env1,env2,env3")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	currentFlagValue := []string{}
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default"}, ",")
+	expected := []string{"env1", "env2", "env3"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSliceMulti() length = %d, want %d", len(got), len(expected))
+	}
+}
+
+func testResolveStringSliceMultiDefaultValueUsedWhenNeitherCLINorENVSet(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	currentFlagValue := []string{}
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", currentFlagValue, []string{"default1", "default2"}, ",")
+	expected := []string{"default1", "default2"}
+	if len(got) != len(expected) {
+		t.Errorf("ResolveStringSliceMulti() length = %d, want %d", len(got), len(expected))
+	}
+}
+
+func testResolveStringSliceMultiENVUsedWhenFlagSetButCurrentFlagValueEmpty(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "from_env_a,from_env_b")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "x"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV", []string{}, []string{"default"}, ",")
+	expected := []string{"from_env_a", "from_env_b"}
+	if len(got) != len(expected) || (len(got) > 0 && (got[0] != expected[0] || got[1] != expected[1])) {
+		t.Errorf("ResolveStringSliceMulti() = %v, want %v", got, expected)
+	}
+}
+
+func testResolveStringSliceMultiDefaultWhenENVSetButParsesToEmpty(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV_MULTI_EMPTY", "  ,  ,  ")
+	defer unsetEnv(t, "TEST_ENV_MULTI_EMPTY")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_MULTI_EMPTY", []string{}, []string{"default"}, ",")
+	if len(got) != 1 || got[0] != "default" {
+		t.Errorf("ResolveStringSliceMulti() = %v, want [default]", got)
+	}
+}
+
+func testResolveStringSliceMultiEmptySeparatorDefaultsToComma(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV_SEP", "a,b,c")
+	defer unsetEnv(t, "TEST_ENV_SEP")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got := ResolveStringSliceMulti(fs, "test-flag", "TEST_ENV_SEP", []string{}, []string{"default"}, "")
+	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+		t.Errorf("ResolveStringSliceMulti() with empty sep = %v, want [a b c]", got)
+	}
+}
+
+func testResolveStringWithValidationCase1(t *testing.T, validator func(string) error) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "valid_env")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "valid_cli"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
+	if err != nil {
+		t.Errorf("ResolveStringWithValidation() error = %v", err)
+	}
+	if got != "valid_cli" {
+		t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_cli")
+	}
+}
+
+func testResolveStringWithValidationCase2(t *testing.T, validator func(string) error) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "valid_env")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "ab"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
+	if err != nil {
+		t.Errorf("ResolveStringWithValidation() error = %v", err)
+	}
+	if got != "valid_env" {
+		t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_env")
+	}
+}
+
+func testResolveStringWithValidationCase3(t *testing.T, validator func(string) error) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "ab")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{"--test-flag", "xy"}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "de", false, validator)
+	if err == nil {
+		t.Error("ResolveStringWithValidation() error = nil, want error")
+	}
+	if got != "de" {
+		t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "de")
+	}
+}
+
+func testResolveStringWithValidationCase4(t *testing.T, validator func(string) error) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", false, validator)
+	if err != nil {
+		t.Errorf("ResolveStringWithValidation() error = %v", err)
+	}
+	if got != "default" {
+		t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "default")
+	}
+}
+
+func testResolveStringWithValidationCase5(t *testing.T, validator func(string) error) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.String("test-flag", "", "test flag")
+	setEnv(t, "TEST_ENV", "  valid_env  ")
+	defer unsetEnv(t, "TEST_ENV")
+
+	if err := fs.Parse([]string{}); err != nil {
+		t.Fatalf("fs.Parse() failed: %v", err)
+	}
+
+	got, err := ResolveStringWithValidation(fs, "test-flag", "TEST_ENV", "default", true, validator)
+	if err != nil {
+		t.Errorf("ResolveStringWithValidation() error = %v", err)
+	}
+	if got != "valid_env" {
+		t.Errorf("ResolveStringWithValidation() = %v, want %v", got, "valid_env")
+	}
 }

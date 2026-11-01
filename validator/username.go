@@ -108,6 +108,38 @@ func ValidateUsername(username string, opts *UsernameOptions) error {
 		}
 	}
 
+	return validateUsernameStyle(username, opts)
+}
+
+// ValidateUsernameSimple validates a username with simple alphanumeric style
+// Convenience function for ValidateUsername with Style: UsernameStyleSimple
+func ValidateUsernameSimple(username string) error {
+	return ValidateUsername(username, &UsernameOptions{Style: UsernameStyleSimple})
+}
+
+// ValidateUsernameRelaxed validates a username with relaxed style
+// Convenience function for ValidateUsername with Style: UsernameStyleRelaxed
+func ValidateUsernameRelaxed(username string) error {
+	return ValidateUsername(username, &UsernameOptions{Style: UsernameStyleRelaxed})
+}
+
+// ValidateUsernameWithReserved validates a username and checks against reserved names
+// Convenience function for ValidateUsername with ReservedNames option
+func ValidateUsernameWithReserved(username string, reservedNames []string) error {
+	return ValidateUsername(username, &UsernameOptions{ReservedNames: reservedNames})
+}
+
+// NormalizeUsername normalizes a username to lowercase
+func NormalizeUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
+}
+
+// IsValidUsernameChar checks if a character is valid for username (default style)
+func IsValidUsernameChar(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+}
+
+func validateUsernameStyle(username string, opts *UsernameOptions) error {
 	// Validate based on style
 	switch opts.Style {
 	case UsernameStyleSimple:
@@ -149,32 +181,4 @@ func ValidateUsername(username string, opts *UsernameOptions) error {
 	}
 
 	return nil
-}
-
-// ValidateUsernameSimple validates a username with simple alphanumeric style
-// Convenience function for ValidateUsername with Style: UsernameStyleSimple
-func ValidateUsernameSimple(username string) error {
-	return ValidateUsername(username, &UsernameOptions{Style: UsernameStyleSimple})
-}
-
-// ValidateUsernameRelaxed validates a username with relaxed style
-// Convenience function for ValidateUsername with Style: UsernameStyleRelaxed
-func ValidateUsernameRelaxed(username string) error {
-	return ValidateUsername(username, &UsernameOptions{Style: UsernameStyleRelaxed})
-}
-
-// ValidateUsernameWithReserved validates a username and checks against reserved names
-// Convenience function for ValidateUsername with ReservedNames option
-func ValidateUsernameWithReserved(username string, reservedNames []string) error {
-	return ValidateUsername(username, &UsernameOptions{ReservedNames: reservedNames})
-}
-
-// NormalizeUsername normalizes a username to lowercase
-func NormalizeUsername(username string) string {
-	return strings.ToLower(strings.TrimSpace(username))
-}
-
-// IsValidUsernameChar checks if a character is valid for username (default style)
-func IsValidUsernameChar(r rune) bool {
-	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
 }

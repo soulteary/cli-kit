@@ -2,6 +2,7 @@ package env
 
 import (
 	"os"
+	"slices"
 	"testing"
 	"time"
 )
@@ -240,7 +241,7 @@ func TestGetStringSlice(t *testing.T) {
 	defer unsetEnv(t, "TEST_STRING_SLICE")
 
 	got := GetStringSlice("TEST_STRING_SLICE", defaultValue, ",")
-	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+	if !slices.Equal(got, []string{"a", "b", "c"}) {
 		t.Errorf("GetStringSlice() = %v, want %v", got, []string{"a", "b", "c"})
 	}
 
@@ -249,7 +250,7 @@ func TestGetStringSlice(t *testing.T) {
 	defer unsetEnv(t, "TEST_STRING_SLICE_CUSTOM")
 
 	got = GetStringSlice("TEST_STRING_SLICE_CUSTOM", defaultValue, "|")
-	if len(got) != 3 || got[0] != "one" || got[1] != "two" || got[2] != "three" {
+	if !slices.Equal(got, []string{"one", "two", "three"}) {
 		t.Errorf("GetStringSlice() = %v, want %v", got, []string{"one", "two", "three"})
 	}
 
@@ -258,13 +259,13 @@ func TestGetStringSlice(t *testing.T) {
 	defer unsetEnv(t, "TEST_STRING_SLICE_EMPTY")
 
 	got = GetStringSlice("TEST_STRING_SLICE_EMPTY", defaultValue, ",")
-	if len(got) != 1 || got[0] != "default" {
+	if !slices.Equal(got, defaultValue) {
 		t.Errorf("GetStringSlice() = %v, want %v", got, defaultValue)
 	}
 
 	// Test with default value
 	got = GetStringSlice("NONEXISTENT_STRING_SLICE", defaultValue, ",")
-	if len(got) != 1 || got[0] != "default" {
+	if !slices.Equal(got, defaultValue) {
 		t.Errorf("GetStringSlice() = %v, want %v", got, defaultValue)
 	}
 
@@ -273,7 +274,7 @@ func TestGetStringSlice(t *testing.T) {
 	defer unsetEnv(t, "TEST_STRING_SLICE_EMPTY_SEP")
 
 	got = GetStringSlice("TEST_STRING_SLICE_EMPTY_SEP", defaultValue, "")
-	if len(got) != 3 || got[0] != "x" || got[1] != "y" || got[2] != "z" {
+	if !slices.Equal(got, []string{"x", "y", "z"}) {
 		t.Errorf("GetStringSlice() with empty sep = %v, want %v", got, []string{"x", "y", "z"})
 	}
 }
