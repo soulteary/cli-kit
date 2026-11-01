@@ -90,40 +90,8 @@ func ValidatePath(path string, opts *PathOptions) (string, error) {
 		return "", err
 	}
 
-	// Check directory restrictions: path must be exactly allowedDir or under it (no prefix bypass)
-	if len(opts.AllowedDirs) > 0 {
-		allowed := false
-		for _, allowedDir := range opts.AllowedDirs {
-			allowedAbsDir, err := filepath.Abs(allowedDir)
-			if err != nil {
-				continue
-			}
-			allowedAbsDir = filepath.Clean(allowedAbsDir)
-
-			if isPathWithinBase(resolvedPath, allowedAbsDir) {
-				allowed = true
-				break
-			}
-
-			// Resolve the allowed base the SAME way the requested path was
-			// resolved: partially, down to its deepest existing ancestor.
-			//
-			// EvalSymlinks alone fails outright when the allowed directory
-			// does not exist yet. With `alias -> /real` and
-			// AllowedDirs: ["alias/future"], the requested "alias/future/file"
-			// canonicalizes to "/real/future/file" while the base stayed the
-			// lexical "alias/future", so a genuinely contained creation was
-			// rejected.
-			allowedResolvedDir, err := resolvePathForPolicy(allowedAbsDir)
-			if err == nil && isPathWithinBase(resolvedPath, allowedResolvedDir) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			// Do not include AllowedDirs in error to avoid leaking allowed paths to callers (e.g. API responses)
-			return "", fmt.Errorf("path is not under allowed directories")
-		}
+	if err := validateAllowedPath(resolvedPath, opts); err != nil {
+		return "", err
 	}
 
 	return resolvedPath, nil
@@ -390,4 +358,44 @@ func randomSuffix() string {
 		return fmt.Sprintf("%d", os.Getpid())
 	}
 	return hex.EncodeToString(b)
+}
+
+func validateAllowedPath(resolvedPath string, opts *PathOptions) error {
+	// Check directory restrictions: path must be exactly allowedDir or under it (no prefix bypass)
+	if len(opts.AllowedDirs) > 0 {
+		allowed := false
+		for _, allowedDir := range opts.AllowedDirs {
+			allowedAbsDir, err := filepath.Abs(allowedDir)
+			if err != nil {
+				continue
+			}
+			allowedAbsDir = filepath.Clean(allowedAbsDir)
+
+			if isPathWithinBase(resolvedPath, allowedAbsDir) {
+				allowed = true
+				break
+			}
+
+			// Resolve the allowed base the SAME way the requested path was
+			// resolved: partially, down to its deepest existing ancestor.
+			//
+			// EvalSymlinks alone fails outright when the allowed directory
+			// does not exist yet. With `alias -> /real` and
+			// AllowedDirs: ["alias/future"], the requested "alias/future/file"
+			// canonicalizes to "/real/future/file" while the base stayed the
+			// lexical "alias/future", so a genuinely contained creation was
+			// rejected.
+			allowedResolvedDir, err := resolvePathForPolicy(allowedAbsDir)
+			if err == nil && isPathWithinBase(resolvedPath, allowedResolvedDir) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			// Do not include AllowedDirs in error to avoid leaking allowed paths to callers (e.g. API responses)
+			return fmt.Errorf("path is not under allowed directories")
+		}
+	}
+
+	return nil
 }

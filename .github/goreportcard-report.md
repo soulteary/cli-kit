@@ -1,44 +1,24 @@
 # Go Report Card
 
-**Grade: A+** (97.7%)
+**Grade: A+** (100.0%)
 
 | Metric | Value |
 | ------ | ----- |
 | Files | 36 |
-| Issues | 7 |
+| Issues | 0 |
 
 ## Checks
 
 | Check | Score |
 | ----- | ----- |
-| go_vet | 100% |
 | gofmt | 100% |
-| gocyclo | 80% |
+| go_vet | 100% |
+| gocyclo | 100% |
 | ineffassign | 100% |
 | license | 100% |
 | misspell | 100% |
 
-## Issues
-
-### gocyclo
-
-- `testutil/env_test.go`
-  - Line 13: cyclomatic complexity 61 for function TestEnvManager
-- `validator/url.go`
-  - Line 222: cyclomatic complexity 24 for function isPrivateIP
-  - Line 88: cyclomatic complexity 22 for function ValidateURL
-- `configutil/priority_test.go`
-  - Line 1088: cyclomatic complexity 22 for function TestResolveStringSliceMulti
-  - Line 979: cyclomatic complexity 18 for function TestResolveStringSlice
-  - Line 790: cyclomatic complexity 17 for function TestResolveStringWithValidation
-- `validator/username.go`
-  - Line 84: cyclomatic complexity 21 for function ValidateUsername
-- `validator/email.go`
-  - Line 54: cyclomatic complexity 21 for function ValidateEmail
-- `env/env_test.go`
-  - Line 235: cyclomatic complexity 17 for function TestGetStringSlice
-- `validator/path.go`
-  - Line 51: cyclomatic complexity 16 for function ValidatePath
+No issues found. Nice work!
 
 ---
 
